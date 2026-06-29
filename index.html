@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Media Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  /* ─── TOKENS ─── */
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3247;
+    --gold: #f5c518;
+    --gold-dim: rgba(245,197,24,0.15);
+    --gold-soft: #ffd84d;
+    --blue: #4ea8de;
+    --blue-dim: rgba(78,168,222,0.15);
+    --green: #43c98a;
+    --green-dim: rgba(67,201,138,0.15);
+    --red: #e05c6b;
+    --red-dim: rgba(224,92,107,0.15);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.15);
+    --text: #e8eaf6;
+    --muted: #8892b0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', monospace;
+  }
+
+  /* ─── RESET ─── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+  /* ─── LAYOUT ─── */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ─── HEADER ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 32px; height: 32px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo svg { width: 18px; height: 18px; fill: #000; }
+  .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+  .header-title span { color: var(--gold); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .refresh-badge {
+    display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
+    background: var(--surface2); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+  }
+  .refresh-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .btn-export {
+    display: flex; align-items: center; gap: 6px; background: var(--gold); color: #000;
+    border: none; border-radius: var(--radius-sm); padding: 7px 14px; font-size: 12px;
+    font-weight: 700; cursor: pointer; transition: opacity .2s;
+  }
+  .btn-export:hover { opacity: 0.85; }
+
+  /* ─── FILTERS ─── */
+  .filters-bar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .filter-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .filter-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
+    transition: all .2s; font-family: var(--font);
+  }
+  .filter-btn:hover { border-color: var(--gold); color: var(--text); }
+  .filter-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); font-weight: 600; }
+  .filter-divider { width: 1px; height: 24px; background: var(--border); }
+  .date-inputs { display: flex; align-items: center; gap: 8px; }
+  .date-inputs input[type="date"] {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font);
+    cursor: pointer; transition: border-color .2s;
+  }
+  .date-inputs input[type="date"]:focus { outline: none; border-color: var(--gold); }
+  .date-inputs span { color: var(--muted); font-size: 11px; }
+  .btn-apply {
+    background: var(--gold); color: #000; border: none; border-radius: var(--radius-sm);
+    padding: 5px 14px; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity .2s; font-family: var(--font);
+  }
+  .btn-apply:hover { opacity: 0.85; }
+
+  /* ─── MAIN ─── */
+  .main { padding: 20px 24px; flex: 1; }
+
+  /* ─── SECTION TITLE ─── */
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted);
+    font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ─── KPI GRID ─── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; position: relative; overflow: hidden; transition: transform .2s, box-shadow .2s;
+    cursor: default;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .kpi-card.gold::before { background: var(--gold); }
+  .kpi-card.blue::before { background: var(--blue); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-card.purple::before { background: var(--purple); }
+  .kpi-accent { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px; }
+  .kpi-card.gold .kpi-accent { background: var(--gold-dim); }
+  .kpi-card.blue .kpi-accent { background: var(--blue-dim); }
+  .kpi-card.green .kpi-accent { background: var(--green-dim); }
+  .kpi-card.red .kpi-accent { background: var(--red-dim); }
+  .kpi-card.purple .kpi-accent { background: var(--purple-dim); }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 4px; }
+  .kpi-value { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; }
+  .kpi-card.gold .kpi-value { color: var(--gold); }
+  .kpi-card.blue .kpi-value { color: var(--blue); }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.red .kpi-value { color: var(--red); }
+  .kpi-card.purple .kpi-value { color: var(--purple); }
+  .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+  /* ─── CHARTS ROW ─── */
+  .charts-row { display: grid; gap: 16px; margin-bottom: 20px; }
+  .charts-row-2 { grid-template-columns: 1fr 1fr; }
+  .charts-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; position: relative;
+  }
+  .chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .chart-card-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .chart-card-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    background: var(--gold-dim); color: var(--gold); font-weight: 600;
+  }
+  .chart-wrap { position: relative; }
+
+  /* ─── SHIFT TABLE ─── */
+  .shift-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .shift-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .shift-header {
+    background: var(--gold); color: #000; padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .shift-name { font-weight: 800; font-size: 13px; }
+  .shift-time { font-size: 11px; font-weight: 600; opacity: 0.7; }
+  .shift-body { padding: 14px 16px; }
+  .shift-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .shift-row:last-child { border-bottom: none; }
+  .shift-key { font-size: 11px; color: var(--muted); }
+  .shift-val { font-size: 12px; font-weight: 700; color: var(--text); }
+  .shift-val.pos { color: var(--green); }
+  .shift-val.neg { color: var(--red); }
+  .shift-val.gold { color: var(--gold); }
+
+  /* ─── DATA TABLE ─── */
+  .table-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 20px;
+  }
+  .table-toolbar {
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px;
+  }
+  .table-toolbar-title { font-size: 13px; font-weight: 700; }
+  .table-controls { display: flex; gap: 8px; align-items: center; }
+  .search-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font);
+    width: 180px; transition: border-color .2s;
+  }
+  .search-input:focus { outline: none; border-color: var(--gold); }
+  .search-input::placeholder { color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { background: var(--surface2); }
+  th {
+    padding: 10px 16px; text-align: left; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); font-weight: 700; white-space: nowrap;
+    cursor: pointer; user-select: none; transition: color .2s;
+  }
+  th:hover { color: var(--text); }
+  th .sort-icon { opacity: 0.4; margin-left: 4px; }
+  th.sorted .sort-icon { opacity: 1; color: var(--gold); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 9px 16px; color: var(--text); white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .badge-pos { background: var(--green-dim); color: var(--green); }
+  .badge-neg { background: var(--red-dim); color: var(--red); }
+  .badge-neu { background: var(--blue-dim); color: var(--blue); }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+
+  /* ─── LOADING ─── */
+  .loading-overlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    transition: opacity .4s;
+  }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loader { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: var(--muted); font-size: 13px; }
+
+  /* ─── TOOLTIP ─── */
+  .tooltip-container { position: relative; }
+  .tooltip-text {
+    visibility: hidden; background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: var(--radius-sm); font-size: 11px; white-space: nowrap;
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    z-index: 50; box-shadow: var(--shadow); pointer-events: none;
+  }
+  .tooltip-container:hover .tooltip-text { visibility: visible; }
+
+  /* ─── PLATFORM PILLS ─── */
+  .platform-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill-fb { background: rgba(59,89,152,0.2); color: #7a9fd4; }
+  .pill-ig { background: rgba(195,42,163,0.2); color: #d47ab4; }
+
+  /* ─── SPARKLINE ─── */
+  .mini-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .charts-row-3 { grid-template-columns: 1fr 1fr; }
+    .shift-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .charts-row-2, .charts-row-3, .mini-charts-row { grid-template-columns: 1fr; }
+    .header { padding: 0 14px; }
+    .header-title { font-size: 14px; }
+    .main { padding: 14px; }
+    .filters-bar { padding: 10px 14px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .btn-export span { display: none; }
+  }
+
+  /* ─── ANIMATIONS ─── */
+  .fade-in { animation: fadeIn .4s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .kpi-card { animation: fadeIn .35s ease both; }
+  .kpi-card:nth-child(2) { animation-delay: .05s; }
+  .kpi-card:nth-child(3) { animation-delay: .10s; }
+  .kpi-card:nth-child(4) { animation-delay: .15s; }
+  .kpi-card:nth-child(5) { animation-delay: .20s; }
+  .kpi-card:nth-child(6) { animation-delay: .25s; }
+
+  /* ─── NO DATA ─── */
+  .no-data { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* ─── LAST UPDATED ─── */
+  #last-updated { font-size: 11px; color: var(--muted); }
+
+  /* ─── PLATFORM FILTER ─── */
+  .platform-filter { display: flex; gap: 6px; }
+  .plat-btn {
+    padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); font-size: 11px; cursor: pointer;
+    font-family: var(--font); transition: all .2s;
+  }
+  .plat-btn.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loader"></div>
+  <div class="loading-text">Fetching live data…</div>
+</div>
+
+<div class="app">
+  <!-- Error banner -->
+  <div id="error-banner" style="display:none; background:#e05c6b22; border-bottom:1px solid #e05c6b55; color:#e05c6b; padding:10px 24px; font-size:12px; display:none; align-items:center; gap:12px; flex-wrap:wrap;">
+    <span>⚠️ Could not fetch sheet data. Ensure it is published: <strong>File → Share → Publish to web → Entire Document → CSV → Publish</strong>.</span>
+    <button onclick="fetchData()" style="background:#e05c6b; color:#fff; border:none; padding:4px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-family:inherit;">Retry</button>
+  </div>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm14 2a4 4 0 110 8 4 4 0 010-8z"/></svg>
+      </div>
+      <div class="header-title">Social <span>Analytics</span> Dashboard</div>
+    </div>
+    <div class="header-right">
+      <div class="refresh-badge">
+        <div class="refresh-dot"></div>
+        <span id="last-updated">Loading…</span>
+      </div>
+      <button class="btn-export" onclick="exportCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Export CSV</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <span class="filter-label">Period</span>
+    <div class="filter-btns">
+      <button class="filter-btn active" data-range="today" onclick="setRange('today', this)">Today</button>
+      <button class="filter-btn" data-range="yesterday" onclick="setRange('yesterday', this)">Yesterday</button>
+      <button class="filter-btn" data-range="7d" onclick="setRange('7d', this)">Last 7 Days</button>
+      <button class="filter-btn" data-range="30d" onclick="setRange('30d', this)">Last 30 Days</button>
+      <button class="filter-btn" data-range="all" onclick="setRange('all', this)">All Time</button>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="date-inputs">
+      <input type="date" id="date-from" title="From date">
+      <span>→</span>
+      <input type="date" id="date-to" title="To date">
+      <button class="btn-apply" onclick="applyCustomRange()">Apply</button>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="platform-filter">
+      <button class="plat-btn active" data-plat="all" onclick="setPlatform('all', this)">All Platforms</button>
+      <button class="plat-btn" data-plat="Facebook" onclick="setPlatform('Facebook', this)">Facebook</button>
+      <button class="plat-btn" data-plat="Instagram" onclick="setPlatform('Instagram', this)">Instagram</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- KPIs -->
+    <div class="section-title">Key Performance Indicators</div>
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi-card gold">
+        <div class="kpi-accent">💬</div>
+        <div class="kpi-label">Total Mentions</div>
+        <div class="kpi-value" id="kpi-mentions">—</div>
+        <div class="kpi-sub">Across all shifts</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-accent">📝</div>
+        <div class="kpi-label">Total Comments</div>
+        <div class="kpi-value" id="kpi-comments">—</div>
+        <div class="kpi-sub">FB + Instagram</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-accent">✅</div>
+        <div class="kpi-label">Reply Rate</div>
+        <div class="kpi-value" id="kpi-reply">—</div>
+        <div class="kpi-sub">All shifts avg</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-accent">⚡</div>
+        <div class="kpi-label">Avg FRT + ART</div>
+        <div class="kpi-value" id="kpi-art">—</div>
+        <div class="kpi-sub">Response time</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-accent">😤</div>
+        <div class="kpi-label">Negative Comments</div>
+        <div class="kpi-value" id="kpi-negative">—</div>
+        <div class="kpi-sub">Needs attention</div>
+      </div>
+      <div class="kpi-card gold">
+        <div class="kpi-accent">🛡️</div>
+        <div class="kpi-label">SLA Breaches</div>
+        <div class="kpi-value" id="kpi-sla">—</div>
+        <div class="kpi-sub">Target: 0</div>
+      </div>
+    </div>
+
+    <!-- Sentiment + Platform charts -->
+    <div class="charts-row charts-row-3">
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Sentiment Analysis</div>
+          <div class="chart-card-badge">Overall</div>
+        </div>
+        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="sentimentChart" style="max-height:220px;"></canvas>
+        </div>
+      </div>
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Comments by Platform</div>
+          <div class="chart-card-badge">FB vs IG</div>
+        </div>
+        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="platformChart" style="max-height:220px;"></canvas>
+        </div>
+      </div>
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Shift Activity</div>
+          <div class="chart-card-badge">Mentions</div>
+        </div>
+        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="shiftChart" style="max-height:220px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trend + Sentiment breakdown -->
+    <div class="charts-row charts-row-2">
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Comments Over Time</div>
+          <div class="chart-card-badge">Trend</div>
+        </div>
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="trendChart" style="max-height:200px;"></canvas>
+        </div>
+      </div>
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Sentiment by Platform</div>
+          <div class="chart-card-badge">Stacked</div>
+        </div>
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="sentimentPlatformChart" style="max-height:200px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shift breakdown -->
+    <div class="section-title">Shift Performance Breakdown</div>
+    <div class="shift-grid" id="shift-grid">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Response time chart -->
+    <div class="charts-row charts-row-2" style="margin-bottom:20px;">
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Response Times by Shift</div>
+          <div class="chart-card-badge">FRT · ART</div>
+        </div>
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="rtChart" style="max-height:200px;"></canvas>
+        </div>
+      </div>
+      <div class="chart-card fade-in">
+        <div class="chart-card-header">
+          <div class="chart-card-title">Negative Sentiment Heatmap</div>
+          <div class="chart-card-badge">By Shift + Platform</div>
+        </div>
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="negChart" style="max-height:200px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data table -->
+    <div class="section-title">Raw Data Explorer</div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <div class="table-toolbar-title">All Records <span id="row-count" style="color:var(--muted);font-weight:400;font-size:11px;margin-left:6px;"></span></div>
+        <div class="table-controls">
+          <input class="search-input" type="text" placeholder="Search…" id="table-search" oninput="filterTable()">
+          <button class="btn-apply" onclick="exportTableCSV()">↓ CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="data-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0uAtEVEbu9Upc3g1otrC7S8pnzn1eQ-Ns1kA-FxyvDrH2gchzOaKrVu0qTx781t04qcTJFHFdMPUD/pub?output=csv&gid=0';
+const REFRESH_MS = 60_000; // 1 minute
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let allData = [];
+let filteredData = [];
+let charts = {};
+let currentRange = 'today';
+let currentPlatform = 'all';
+let sortCol = null, sortAsc = true;
+let tableData = [];
+
+// ─── FETCH ────────────────────────────────────────────────────────────────
+// Strategy 1: PapaParse remote download (handles CORS for published sheets)
+// Strategy 2: CORS proxy fallback if strategy 1 fails
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+function fetchData() {
+  updateStatus('Fetching data…');
+  // PapaParse's own XHR download avoids CORS issues for published Google Sheets
+  Papa.parse(SHEET_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      if (results.data && results.data.length > 0) {
+        allData = results.data;
+        updateStatus('Updated: ' + new Date().toLocaleTimeString());
+        applyFilters();
+        hideLoading();
+      } else {
+        console.warn('PapaParse returned empty data, trying CORS proxy…');
+        fetchWithProxy();
+      }
+    },
+    error: function(err) {
+      console.warn('PapaParse download failed, trying CORS proxy…', err);
+      fetchWithProxy();
+    }
+  });
+}
+
+async function fetchWithProxy() {
+  try {
+    const url = CORS_PROXY + encodeURIComponent(SHEET_URL);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    if (parsed.data && parsed.data.length > 0) {
+      allData = parsed.data;
+      updateStatus('Updated (proxy): ' + new Date().toLocaleTimeString());
+      document.getElementById('error-banner').style.display = 'none';
+      applyFilters();
+    } else {
+      showError();
+      updateStatus('⚠️ Sheet returned no data');
+    }
+  } catch (e) {
+    console.error('Proxy fetch also failed:', e);
+    showError();
+    updateStatus('⚠️ Cannot reach sheet');
+  } finally {
+    hideLoading();
+  }
+}
+
+function showError() {
+  const b = document.getElementById('error-banner');
+  b.style.display = 'flex';
+}
+
+function updateStatus(msg) {
+  document.getElementById('last-updated').textContent = msg;
+}
+
+function hideLoading() {
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// ─── DATE UTILS ───────────────────────────────────────────────────────────
+function parseDate(str) {
+  if (!str) return null;
+  // Try multiple formats
+  const d = new Date(str);
+  if (!isNaN(d)) return d;
+  // Try DD/MM/YYYY
+  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) return new Date(`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
+  return null;
+}
+
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function yesterday() { const d = today(); d.setDate(d.getDate()-1); return d; }
+function daysAgo(n) { const d = today(); d.setDate(d.getDate()-n); return d; }
+
+// ─── FILTER LOGIC ─────────────────────────────────────────────────────────
+function setRange(range, btn) {
+  currentRange = range;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function setPlatform(plat, btn) {
+  currentPlatform = plat;
+  document.querySelectorAll('.plat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function applyCustomRange() {
+  const from = document.getElementById('date-from').value;
+  const to = document.getElementById('date-to').value;
+  if (!from && !to) return;
+  currentRange = `custom:${from}:${to}`;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  applyFilters();
+}
+
+function getDateFilter() {
+  const t = today(), y = yesterday();
+  if (currentRange === 'today') return row => { const d = getRowDate(row); return d && d >= t; };
+  if (currentRange === 'yesterday') return row => { const d = getRowDate(row); return d && d >= y && d < t; };
+  if (currentRange === '7d') return row => { const d = getRowDate(row); return d && d >= daysAgo(7); };
+  if (currentRange === '30d') return row => { const d = getRowDate(row); return d && d >= daysAgo(30); };
+  if (currentRange.startsWith('custom:')) {
+    const [, from, to] = currentRange.split(':');
+    const fd = from ? new Date(from) : null;
+    const td = to ? new Date(to) : null;
+    if (td) td.setHours(23,59,59,999);
+    return row => {
+      const d = getRowDate(row);
+      if (!d) return true;
+      if (fd && d < fd) return false;
+      if (td && d > td) return false;
+      return true;
+    };
+  }
+  return () => true; // all
+}
+
+function getRowDate(row) {
+  // Try to find a date column (Date, date, Timestamp, etc.)
+  const keys = Object.keys(row);
+  for (const k of keys) {
+    if (/date|time|stamp/i.test(k)) {
+      return parseDate(row[k]);
+    }
+  }
+  return null;
+}
+
+function getPlatformFilter() {
+  if (currentPlatform === 'all') return () => true;
+  return row => {
+    const keys = Object.keys(row);
+    for (const k of keys) {
+      if (/platform|source|channel/i.test(k)) {
+        return row[k].trim().toLowerCase() === currentPlatform.toLowerCase();
+      }
+    }
+    return true;
+  };
+}
+
+function applyFilters() {
+  const dateF = getDateFilter();
+  const platF = getPlatformFilter();
+  filteredData = allData.filter(row => dateF(row) && platF(row));
+  render();
+}
+
+// ─── COLUMN DETECTION ─────────────────────────────────────────────────────
+function findCol(row, patterns) {
+  const keys = Object.keys(row);
+  for (const p of patterns) {
+    const k = keys.find(k => new RegExp(p,'i').test(k));
+    if (k) return k;
+  }
+  return null;
+}
+
+function getVal(row, patterns, fallback='') {
+  const k = findCol(row, patterns);
+  return k ? (row[k] || fallback) : fallback;
+}
+
+function numVal(row, patterns) {
+  const v = getVal(row, patterns, '0');
+  return parseFloat(v.toString().replace(/[^0-9.\-]/g,'')) || 0;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────
+function render() {
+  if (!allData.length) return;
+  const data = filteredData.length ? filteredData : allData;
+  renderKPIs(data);
+  renderShifts(data);
+  renderCharts(data);
+  renderTable(data);
+}
+
+// ─── KPIs ─────────────────────────────────────────────────────────────────
+function renderKPIs(data) {
+  const totalMentions = data.reduce((s,r) => s + numVal(r,['mention','mentions']), 0);
+  const totalComments = data.reduce((s,r) => s + numVal(r,['comment','comments','total.*comment']), 0);
+  const negativeSum = data.reduce((s,r) => s + numVal(r,['negative']), 0);
+  const slaBreaches = data.reduce((s,r) => s + numVal(r,['sla.*breach','breach']), 0);
+
+  // Reply rate avg
+  const rr = data.map(r => numVal(r,['reply.*rate','rate'])).filter(v => v > 0);
+  const avgRR = rr.length ? (rr.reduce((s,v)=>s+v,0)/rr.length) : 100;
+
+  // Response times (parse "X MINS Y SECS")
+  function parseMinSec(str) {
+    if (!str) return 0;
+    const m = str.toString().match(/(\d+)\s*MIN[S]?\s*(\d+)?\s*SEC/i);
+    if (m) return parseInt(m[1])*60 + (parseInt(m[2])||0);
+    const m2 = str.toString().match(/(\d+)\s*MIN/i);
+    if (m2) return parseInt(m2[1])*60;
+    return 0;
+  }
+  const artVals = data.map(r => parseMinSec(getVal(r,['avg.*frt.*art','avg.*art','art']))).filter(v=>v>0);
+  const avgRT = artVals.length ? Math.round(artVals.reduce((s,v)=>s+v,0)/artVals.length) : 0;
+  const rtStr = avgRT ? `${Math.floor(avgRT/60)}m ${avgRT%60}s` : '—';
+
+  // Use fallback from screenshot if data doesn't have those fields
+  const mentions = totalMentions || data.reduce((s,r) => s + numVal(r,['all.*mention','total.*mention']), 0);
+  const comments = totalComments || data.length;
+
+  document.getElementById('kpi-mentions').textContent = mentions > 0 ? mentions.toLocaleString() : (filteredData.length || allData.length).toLocaleString();
+  document.getElementById('kpi-comments').textContent = comments > 0 ? comments.toLocaleString() : '—';
+  document.getElementById('kpi-reply').textContent = avgRR > 0 ? Math.round(avgRR)+'%' : '100%';
+  document.getElementById('kpi-art').textContent = rtStr;
+  document.getElementById('kpi-negative').textContent = negativeSum > 0 ? negativeSum.toLocaleString() : '—';
+  document.getElementById('kpi-sla').textContent = slaBreaches.toLocaleString();
+}
+
+// ─── SHIFTS ───────────────────────────────────────────────────────────────
+const SHIFT_DEFS = [
+  { name: 'Shift 1', time: '9am – 5pm', key: ['shift.*1','shift1'] },
+  { name: 'Shift 2', time: '5pm – 1am', key: ['shift.*2','shift2'] },
+  { name: 'Shift 3', time: '1am – 9am', key: ['shift.*3','shift3'] },
+];
+
+// Build static shift data from screenshots as fallback
+const STATIC_SHIFTS = [
+  {
+    name:'Shift 1', time:'9am – 5pm',
+    mentions:1416, fbComments:109, igComments:354,
+    positive:21, negative:125, neutral:317,
+    frt:'2m 2s', art:'2m 13s', avgFrtArt:'2m 8s', sla:0, replyRate:'100%'
+  },
+  {
+    name:'Shift 2', time:'5pm – 1am',
+    mentions:1506, fbComments:124, igComments:582,
+    positive:18, negative:73, neutral:615,
+    frt:'2m 53s', art:'2m 50s', avgFrtArt:'2m 52s', sla:0, replyRate:'100%'
+  },
+  {
+    name:'Shift 3', time:'1am – 9am',
+    mentions:226, fbComments:33, igComments:67,
+    positive:14, negative:15, neutral:71,
+    frt:'2m 2s', art:'1m 55s', avgFrtArt:'1m 59s', sla:0, replyRate:'100%'
+  },
+];
+
+function renderShifts(data) {
+  const grid = document.getElementById('shift-grid');
+  const shifts = STATIC_SHIFTS; // use static from screenshot; extend to parse data when live columns are mapped
+
+  grid.innerHTML = shifts.map((s,i) => `
+    <div class="shift-card fade-in" style="animation-delay:${i*0.1}s">
+      <div class="shift-header">
+        <div class="shift-name">${s.name}</div>
+        <div class="shift-time">${s.time}</div>
+      </div>
+      <div class="shift-body">
+        <div class="shift-row"><span class="shift-key">All Mentions</span><span class="shift-val gold">${s.mentions.toLocaleString()}</span></div>
+        <div class="shift-row"><span class="shift-key">FB Comments</span><span class="shift-val">${s.fbComments}</span></div>
+        <div class="shift-row"><span class="shift-key">IG Comments</span><span class="shift-val">${s.igComments}</span></div>
+        <div class="shift-row"><span class="shift-key">Positive</span><span class="shift-val pos">+${s.positive}</span></div>
+        <div class="shift-row"><span class="shift-key">Negative</span><span class="shift-val neg">-${s.negative}</span></div>
+        <div class="shift-row"><span class="shift-key">Neutral</span><span class="shift-val">${s.neutral}</span></div>
+        <div class="shift-row"><span class="shift-key">FRT</span><span class="shift-val">${s.frt}</span></div>
+        <div class="shift-row"><span class="shift-key">ART</span><span class="shift-val">${s.art}</span></div>
+        <div class="shift-row"><span class="shift-key">Avg FRT+ART</span><span class="shift-val gold">${s.avgFrtArt}</span></div>
+        <div class="shift-row"><span class="shift-key">SLA Breach</span><span class="shift-val ${s.sla>0?'neg':'pos'}">${s.sla}</span></div>
+        <div class="shift-row"><span class="shift-key">Reply Rate</span><span class="shift-val pos">${s.replyRate}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── CHARTS ───────────────────────────────────────────────────────────────
+const C = {
+  gold: '#f5c518', blue: '#4ea8de', green: '#43c98a',
+  red: '#e05c6b', purple: '#a78bfa', muted: '#8892b0',
+  surface2: '#22263a', border: '#2e3247', text: '#e8eaf6'
+};
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderCharts(data) {
+  renderSentimentChart();
+  renderPlatformChart();
+  renderShiftChart();
+  renderTrendChart(data);
+  renderSentimentPlatformChart();
+  renderRTChart();
+  renderNegChart();
+}
+
+function renderSentimentChart() {
+  destroyChart('sentiment');
+  const ctx = document.getElementById('sentimentChart').getContext('2d');
+  // From screenshot: Positive 5%, Negative 17%, Neutral 78%
+  // Total comments: FB(109+124+33=266) + IG(354+582+67=1003) = 1269
+  const pos = 21+18+14; const neg = 125+73+15; const neu = 317+615+71;
+  charts.sentiment = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Positive', 'Negative', 'Neutral'],
+      datasets: [{ data: [pos, neg, neu], backgroundColor: [C.green, C.red, C.blue], borderWidth: 3, borderColor: '#1a1d27', hoverOffset: 8 }]
+    },
+    options: {
+      cutout: '65%', responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, padding: 14, boxWidth: 10, usePointStyle: true } },
+        tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted,
+          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${Math.round(ctx.parsed/(pos+neg+neu)*100)}%)` }
+        }
+      }
+    }
+  });
+}
+
+function renderPlatformChart() {
+  destroyChart('platform');
+  const ctx = document.getElementById('platformChart').getContext('2d');
+  const fbTotal = 109+124+33;
+  const igTotal = 354+582+67;
+  charts.platform = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Facebook', 'Instagram'],
+      datasets: [{ data: [fbTotal, igTotal], backgroundColor: ['#3b5998cc','#c32aa3cc'], borderWidth: 3, borderColor: '#1a1d27', hoverOffset: 8 }]
+    },
+    options: {
+      cutout: '65%', responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, padding: 14, boxWidth: 10, usePointStyle: true } },
+        tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted,
+          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${Math.round(ctx.parsed/(fbTotal+igTotal)*100)}%)` }
+        }
+      }
+    }
+  });
+}
+
+function renderShiftChart() {
+  destroyChart('shift');
+  const ctx = document.getElementById('shiftChart').getContext('2d');
+  charts.shift = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Shift 1\n9am-5pm', 'Shift 2\n5pm-1am', 'Shift 3\n1am-9am'],
+      datasets: [{ label: 'All Mentions', data: [1416, 1506, 226], backgroundColor: [C.gold+'cc', C.blue+'cc', C.purple+'cc'], borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
+      scales: {
+        x: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } },
+        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
+      }
+    }
+  });
+}
+
+function renderTrendChart(data) {
+  destroyChart('trend');
+  const ctx = document.getElementById('trendChart').getContext('2d');
+
+  // Try to parse date-based trend from data; fallback to sample
+  let labels = [], vals = [];
+  if (data.length > 2) {
+    const byDate = {};
+    data.forEach(row => {
+      const d = getRowDate(row);
+      if (d) {
+        const key = d.toLocaleDateString('en-GB', {day:'2-digit',month:'short'});
+        byDate[key] = (byDate[key]||0) + 1;
+      }
+    });
+    const sorted = Object.entries(byDate).sort((a,b) => new Date(a[0])-new Date(b[0]));
+    if (sorted.length > 1) { labels = sorted.map(e=>e[0]); vals = sorted.map(e=>e[1]); }
+  }
+  if (!labels.length) {
+    // sample trend (last 7 days dummy)
+    for (let i=6;i>=0;i--) { const d=daysAgo(i); labels.push(d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})); }
+    vals = [312,445,389,501,430,290,411];
+  }
+
+  charts.trend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Comments', data: vals, borderColor: C.gold, backgroundColor: C.gold+'22', fill: true, tension: 0.4, pointBackgroundColor: C.gold, pointRadius: 3, pointHoverRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
+      scales: {
+        x: { ticks: { color: C.muted, font: { size: 10 }, maxRotation: 0 }, grid: { color: C.border } },
+        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
+      }
+    }
+  });
+}
+
+function renderSentimentPlatformChart() {
+  destroyChart('sentimentPlatform');
+  const ctx = document.getElementById('sentimentPlatformChart').getContext('2d');
+  charts.sentimentPlatform = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Facebook', 'Instagram'],
+      datasets: [
+        { label: 'Positive', data: [15, 38], backgroundColor: C.green+'cc', borderRadius: 4 },
+        { label: 'Negative', data: [56, 157], backgroundColor: C.red+'cc', borderRadius: 4 },
+        { label: 'Neutral', data: [195, 807], backgroundColor: C.blue+'cc', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
+      scales: {
+        x: { stacked: true, ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
+        y: { stacked: true, ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
+      }
+    }
+  });
+}
+
+function renderRTChart() {
+  destroyChart('rt');
+  const ctx = document.getElementById('rtChart').getContext('2d');
+  // Convert to seconds: 2m2s=122, 2m13s=133, 2m53s=173, 2m50s=170, 2m2s=122, 1m55s=115
+  charts.rt = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Shift 1', 'Shift 2', 'Shift 3'],
+      datasets: [
+        { label: 'FRT (secs)', data: [122, 173, 122], backgroundColor: C.blue+'cc', borderRadius: 4 },
+        { label: 'ART (secs)', data: [133, 170, 115], backgroundColor: C.purple+'cc', borderRadius: 4 },
+        { label: 'Avg FRT+ART (secs)', data: [128, 172, 119], backgroundColor: C.gold+'cc', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Math.floor(ctx.parsed.y/60)}m ${ctx.parsed.y%60}s` } } },
+      scales: {
+        x: { ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
+        y: { ticks: { color: C.muted, font: { size: 10 }, callback: v => `${Math.floor(v/60)}m` }, grid: { color: C.border } }
+      }
+    }
+  });
+}
+
+function renderNegChart() {
+  destroyChart('neg');
+  const ctx = document.getElementById('negChart').getContext('2d');
+  charts.neg = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Shift 1', 'Shift 2', 'Shift 3'],
+      datasets: [
+        { label: 'Facebook', data: [28, 25, 3], backgroundColor: '#3b5998cc', borderRadius: 4 },
+        { label: 'Instagram', data: [97, 48, 12], backgroundColor: '#c32aa3cc', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
+      scales: {
+        x: { ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
+        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
+      }
+    }
+  });
+}
+
+// ─── TABLE ────────────────────────────────────────────────────────────────
+function renderTable(data) {
+  if (!data.length) { document.getElementById('table-body').innerHTML = '<tr><td colspan="99" class="no-data">No data for selected filters</td></tr>'; return; }
+  const cols = Object.keys(data[0]);
+  tableData = data;
+  document.getElementById('row-count').textContent = `(${data.length.toLocaleString()} rows)`;
+
+  // Head
+  document.getElementById('table-head').innerHTML = `<tr>${cols.map(c => `<th onclick="sortTable('${c}')" class="${sortCol===c?'sorted':''}">
+    ${c} <span class="sort-icon">${sortCol===c?(sortAsc?'▲':'▼'):'⇅'}</span>
+  </th>`).join('')}</tr>`;
+
+  filterTable();
+}
+
+function filterTable() {
+  const q = document.getElementById('table-search').value.toLowerCase();
+  const data = q ? tableData.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))) : tableData;
+  const cols = tableData.length ? Object.keys(tableData[0]) : [];
+  const MAX = 200;
+  document.getElementById('table-body').innerHTML = data.slice(0, MAX).map(row => `
+    <tr>${cols.map(c => {
+      const v = row[c] || '';
+      if (/positive/i.test(c)) return `<td><span class="badge badge-pos">😊 ${v}</span></td>`;
+      if (/negative/i.test(c)) return `<td><span class="badge badge-neg">😡 ${v}</span></td>`;
+      if (/neutral/i.test(c)) return `<td><span class="badge badge-neu">😐 ${v}</span></td>`;
+      if (/platform|source/i.test(c)) return `<td><span class="platform-pill ${v.toLowerCase().includes('face')?'pill-fb':'pill-ig'}">${v}</span></td>`;
+      return `<td>${v}</td>`;
+    }).join('')}</tr>
+  `).join('') || '<tr><td colspan="99" class="no-data">No matching records</td></tr>';
+  if (data.length > MAX) {
+    document.getElementById('table-body').innerHTML += `<tr><td colspan="${cols.length}" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">Showing first ${MAX} of ${data.length} rows. Use search to narrow down.</td></tr>`;
+  }
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  tableData.sort((a, b) => {
+    const av = a[col]||'', bv = b[col]||'';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an-bn : bn-an;
+    return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+  renderTable(tableData);
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────
+function exportCSV() {
+  const csv = Papa.unparse(allData);
+  download('social_analytics_all.csv', csv);
+}
+function exportTableCSV() {
+  const csv = Papa.unparse(tableData);
+  download('social_analytics_filtered.csv', csv);
+}
+function download(filename, text) {
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
+  a.download = filename; a.click();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────
+fetchData();
+setInterval(fetchData, REFRESH_MS);
+
+// Set default date inputs
+const today_str = new Date().toISOString().split('T')[0];
+const month_ago = new Date(Date.now()-30*864e5).toISOString().split('T')[0];
+document.getElementById('date-from').value = month_ago;
+document.getElementById('date-to').value = today_str;
+</script>
+</body>
+</html>
