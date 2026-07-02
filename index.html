@@ -3,1058 +3,1086 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Social Media Analytics Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<title>Frido — Online Reputation Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+// Fallback CDNs in case the primary jsdelivr host is blocked on this network
+function ensureScript(testFn, srcList, cb){
+  if(testFn()){ cb(); return; }
+  let i = 0;
+  function tryNext(){
+    if(testFn()){ cb(); return; }
+    if(i >= srcList.length){ cb(); return; }
+    const s = document.createElement("script");
+    s.src = srcList[i++];
+    s.onload = tryNext;
+    s.onerror = tryNext;
+    document.head.appendChild(s);
+  }
+  tryNext();
+}
+</script>
 <style>
-  /* ─── TOKENS ─── */
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #22263a;
-    --border: #2e3247;
-    --gold: #f5c518;
-    --gold-dim: rgba(245,197,24,0.15);
-    --gold-soft: #ffd84d;
-    --blue: #4ea8de;
-    --blue-dim: rgba(78,168,222,0.15);
-    --green: #43c98a;
-    --green-dim: rgba(67,201,138,0.15);
-    --red: #e05c6b;
-    --red-dim: rgba(224,92,107,0.15);
-    --purple: #a78bfa;
-    --purple-dim: rgba(167,139,250,0.15);
-    --text: #e8eaf6;
-    --muted: #8892b0;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 24px rgba(0,0,0,0.4);
-    --font: 'Segoe UI', system-ui, sans-serif;
-    --mono: 'Consolas', monospace;
-  }
+/* ============================= TOKENS ============================= */
+:root{
+  --ink:#15201e;
+  --paper:#f5f2ea;
+  --panel:#ffffff;
+  --teal:#0f4a43;
+  --teal-deep:#0a332e;
+  --amber:#d99a2b;
+  --amber-soft:#f3e0b8;
+  --coral:#c1543c;
+  --line:#e4ddca;
+  --muted:#6b7570;
+  --pos:#2f7a4f;
+  --neu:#9a8a3f;
+  --neg:#c1543c;
+  --mix:#7d5fa3;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(15,32,29,.04), 0 8px 24px -12px rgba(15,32,29,.18);
+  --font-display:'Fraunces', serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important; transition-duration:.001ms !important;}
+}
+::selection{background:var(--amber-soft);}
 
-  /* ─── RESET ─── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+/* ============================= LAYOUT ============================= */
+.shell{max-width:1440px;margin:0 auto;padding:0 28px 64px;}
+header.top{
+  background:linear-gradient(160deg, var(--teal-deep), var(--teal) 70%);
+  color:#f5f2ea;
+  padding:30px 28px 26px;
+  border-radius:0 0 28px 28px;
+  margin-bottom:26px;
+  position:relative;
+  overflow:hidden;
+}
+header.top::after{
+  content:"";
+  position:absolute; right:-60px; top:-80px;
+  width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, rgba(217,154,43,.35), transparent 70%);
+}
+.top-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;position:relative;z-index:1;}
+.brand-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber-soft);opacity:.85;margin-bottom:6px;}
+h1.brand{font-family:var(--font-display);font-weight:600;font-size:clamp(26px,3.4vw,38px);margin:0;letter-spacing:-.01em;}
+.brand-sub{font-size:13.5px;color:#cfe4df;margin-top:6px;max-width:520px;line-height:1.5;}
+.status-cluster{display:flex;flex-direction:column;align-items:flex-end;gap:8px;font-size:12.5px;}
+.live-pill{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);padding:6px 12px;border-radius:999px;font-family:var(--font-mono);}
+.dot{width:7px;height:7px;border-radius:50%;background:#5fd99a;box-shadow:0 0 0 0 rgba(95,217,154,.6);animation:pulse 2s infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(95,217,154,.55)}70%{box-shadow:0 0 0 8px rgba(95,217,154,0)}100%{box-shadow:0 0 0 0 rgba(95,217,154,0)}}
+.refresh-btn{background:var(--amber);color:var(--teal-deep);border:none;font-family:var(--font-body);font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;transition:transform .15s ease, filter .15s ease;}
+.refresh-btn:hover{filter:brightness(1.07);transform:translateY(-1px);}
+.refresh-btn:active{transform:translateY(0);}
+.source-link{color:#cfe4df; opacity:.7; font-size:11px;}
+.source-link a{color:#cfe4df;}
 
-  /* ─── LAYOUT ─── */
-  .app { display: flex; flex-direction: column; min-height: 100vh; }
+/* ============================= FILTER BAR ============================= */
+.filterbar{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:18px 20px;
+  margin-bottom:24px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px 22px;
+  align-items:flex-end;
+}
+.filter-group{display:flex;flex-direction:column;gap:7px;}
+.filter-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;font-family:var(--font-mono);}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{
+  border:1px solid var(--line);
+  background:#fbfaf5;
+  color:var(--ink);
+  font-size:12.5px;
+  font-weight:600;
+  padding:6px 12px;
+  border-radius:999px;
+  cursor:pointer;
+  transition:all .15s ease;
+  user-select:none;
+}
+.chip:hover{border-color:var(--teal);}
+.chip.active{background:var(--teal);border-color:var(--teal);color:#fff;}
+.chip.active.sent-pos{background:var(--pos);border-color:var(--pos);}
+.chip.active.sent-neu{background:var(--neu);border-color:var(--neu);}
+.chip.active.sent-neg{background:var(--neg);border-color:var(--neg);}
+.chip.active.sent-mix{background:var(--mix);border-color:var(--mix);}
+.date-inputs{display:flex;gap:6px;align-items:center;}
+input[type=date], select{
+  border:1px solid var(--line);
+  background:#fbfaf5;
+  border-radius:8px;
+  padding:6px 9px;
+  font-family:var(--font-body);
+  font-size:12.5px;
+  color:var(--ink);
+}
+select{min-width:160px;cursor:pointer;}
+.filter-spacer{flex:1;}
+.clear-btn{
+  background:none;border:1px dashed var(--coral);color:var(--coral);
+  font-size:12px;font-weight:700;padding:7px 13px;border-radius:999px;cursor:pointer;
+}
+.clear-btn:hover{background:rgba(193,84,60,.08);}
 
-  /* ─── HEADER ─── */
-  .header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    height: 60px; position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
-  }
-  .header-left { display: flex; align-items: center; gap: 12px; }
-  .logo { width: 32px; height: 32px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-  .logo svg { width: 18px; height: 18px; fill: #000; }
-  .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
-  .header-title span { color: var(--gold); }
-  .header-right { display: flex; align-items: center; gap: 12px; }
-  .refresh-badge {
-    display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
-    background: var(--surface2); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
-  }
-  .refresh-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .btn-export {
-    display: flex; align-items: center; gap: 6px; background: var(--gold); color: #000;
-    border: none; border-radius: var(--radius-sm); padding: 7px 14px; font-size: 12px;
-    font-weight: 700; cursor: pointer; transition: opacity .2s;
-  }
-  .btn-export:hover { opacity: 0.85; }
+/* ============================= KPI GRID ============================= */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+  gap:14px;
+  margin-bottom:26px;
+}
+.kpi-card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:16px 18px;
+  position:relative;
+  overflow:hidden;
+  animation:rise .45s ease both;
+}
+.kpi-card .bar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teal);}
+.kpi-card.amber .bar{background:var(--amber);}
+.kpi-card.coral .bar{background:var(--coral);}
+.kpi-card.pos .bar{background:var(--pos);}
+.kpi-card.neg .bar{background:var(--neg);}
+.kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;font-family:var(--font-mono);margin-bottom:8px;}
+.kpi-value{font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1;letter-spacing:-.01em;}
+.kpi-sub{font-size:11.5px;color:var(--muted);margin-top:6px;}
+@keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
-  /* ─── FILTERS ─── */
-  .filters-bar {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 12px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  }
-  .filter-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-  .filter-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-  .filter-btn {
-    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
-    padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
-    transition: all .2s; font-family: var(--font);
-  }
-  .filter-btn:hover { border-color: var(--gold); color: var(--text); }
-  .filter-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); font-weight: 600; }
-  .filter-divider { width: 1px; height: 24px; background: var(--border); }
-  .date-inputs { display: flex; align-items: center; gap: 8px; }
-  .date-inputs input[type="date"] {
-    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-    padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font);
-    cursor: pointer; transition: border-color .2s;
-  }
-  .date-inputs input[type="date"]:focus { outline: none; border-color: var(--gold); }
-  .date-inputs span { color: var(--muted); font-size: 11px; }
-  .btn-apply {
-    background: var(--gold); color: #000; border: none; border-radius: var(--radius-sm);
-    padding: 5px 14px; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity .2s; font-family: var(--font);
-  }
-  .btn-apply:hover { opacity: 0.85; }
+/* ============================= SECTION ============================= */
+.section{margin-bottom:30px;}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.section-title{font-family:var(--font-display);font-size:20px;font-weight:600;}
+.section-note{font-size:12px;color:var(--muted);}
 
-  /* ─── MAIN ─── */
-  .main { padding: 20px 24px; flex: 1; }
+/* ============================= SHIFT TABLE (screenshot recreation) ============================= */
+.shift-table-wrap{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow); overflow-x:auto;
+}
+table.shift-table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px;}
+table.shift-table th, table.shift-table td{padding:10px 16px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;}
+table.shift-table thead th{
+  background:var(--amber);color:var(--teal-deep);font-family:var(--font-mono);
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;
+}
+table.shift-table td.metric-label{font-weight:700;color:var(--teal-deep);background:var(--amber-soft);}
+table.shift-table tbody tr:hover td{background:#faf6ea;}
+table.shift-table td.num{font-family:var(--font-mono);font-weight:600;}
+.row-group-label{font-weight:800;background:#efe9d6;}
 
-  /* ─── SECTION TITLE ─── */
-  .section-title {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted);
-    font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-  }
-  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+/* ============================= CHART GRID ============================= */
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px;}
+.chart-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:18px 18px 10px;
+}
+.chart-card h3{font-family:var(--font-display);font-size:16px;margin:0 0 4px;font-weight:600;}
+.chart-card p.hint{margin:0 0 10px;font-size:11.5px;color:var(--muted);}
+.chart-canvas-box{position:relative;height:260px;}
+.chart-canvas-box.tall{height:320px;}
 
-  /* ─── KPI GRID ─── */
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .kpi-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; position: relative; overflow: hidden; transition: transform .2s, box-shadow .2s;
-    cursor: default;
-  }
-  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-  .kpi-card.gold::before { background: var(--gold); }
-  .kpi-card.blue::before { background: var(--blue); }
-  .kpi-card.green::before { background: var(--green); }
-  .kpi-card.red::before { background: var(--red); }
-  .kpi-card.purple::before { background: var(--purple); }
-  .kpi-accent { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px; }
-  .kpi-card.gold .kpi-accent { background: var(--gold-dim); }
-  .kpi-card.blue .kpi-accent { background: var(--blue-dim); }
-  .kpi-card.green .kpi-accent { background: var(--green-dim); }
-  .kpi-card.red .kpi-accent { background: var(--red-dim); }
-  .kpi-card.purple .kpi-accent { background: var(--purple-dim); }
-  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 4px; }
-  .kpi-value { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; }
-  .kpi-card.gold .kpi-value { color: var(--gold); }
-  .kpi-card.blue .kpi-value { color: var(--blue); }
-  .kpi-card.green .kpi-value { color: var(--green); }
-  .kpi-card.red .kpi-value { color: var(--red); }
-  .kpi-card.purple .kpi-value { color: var(--purple); }
-  .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+/* ============================= DATA TABLE ============================= */
+.table-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.search-input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;background:#fbfaf5;}
+.export-btn{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.export-btn:hover{filter:brightness(1.1);}
+.table-scroll{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);}
+table.data-table{border-collapse:collapse;width:100%;font-size:12.5px;}
+table.data-table thead th{
+  position:sticky;top:0;background:var(--teal);color:#fff;padding:9px 12px;text-align:left;
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;white-space:nowrap;
+}
+table.data-table thead th:hover{background:var(--teal-deep);}
+table.data-table td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.data-table tbody tr:nth-child(even){background:#fbfaf5;}
+table.data-table tbody tr:hover{background:var(--amber-soft);}
+.badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+.badge.pos{background:#dff1e4;color:var(--pos);}
+.badge.neu{background:#f1ecd6;color:var(--neu);}
+.badge.neg{background:#f7e2dd;color:var(--neg);}
+.badge.mix{background:#ece3f4;color:var(--mix);}
+.badge.sla-yes{background:#f7e2dd;color:var(--neg);}
+.badge.sla-no{background:#dff1e4;color:var(--pos);}
+.empty-state{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
 
-  /* ─── CHARTS ROW ─── */
-  .charts-row { display: grid; gap: 16px; margin-bottom: 20px; }
-  .charts-row-2 { grid-template-columns: 1fr 1fr; }
-  .charts-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-  .chart-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 20px; position: relative;
-  }
-  .chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .chart-card-title { font-size: 13px; font-weight: 700; color: var(--text); }
-  .chart-card-badge {
-    font-size: 10px; padding: 2px 8px; border-radius: 10px;
-    background: var(--gold-dim); color: var(--gold); font-weight: 600;
-  }
-  .chart-wrap { position: relative; }
-
-  /* ─── SHIFT TABLE ─── */
-  .shift-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
-  .shift-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .shift-header {
-    background: var(--gold); color: #000; padding: 10px 16px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .shift-name { font-weight: 800; font-size: 13px; }
-  .shift-time { font-size: 11px; font-weight: 600; opacity: 0.7; }
-  .shift-body { padding: 14px 16px; }
-  .shift-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
-  .shift-row:last-child { border-bottom: none; }
-  .shift-key { font-size: 11px; color: var(--muted); }
-  .shift-val { font-size: 12px; font-weight: 700; color: var(--text); }
-  .shift-val.pos { color: var(--green); }
-  .shift-val.neg { color: var(--red); }
-  .shift-val.gold { color: var(--gold); }
-
-  /* ─── DATA TABLE ─── */
-  .table-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    overflow: hidden; margin-bottom: 20px;
-  }
-  .table-toolbar {
-    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px;
-  }
-  .table-toolbar-title { font-size: 13px; font-weight: 700; }
-  .table-controls { display: flex; gap: 8px; align-items: center; }
-  .search-input {
-    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-    padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font);
-    width: 180px; transition: border-color .2s;
-  }
-  .search-input:focus { outline: none; border-color: var(--gold); }
-  .search-input::placeholder { color: var(--muted); }
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  thead tr { background: var(--surface2); }
-  th {
-    padding: 10px 16px; text-align: left; font-size: 10px; text-transform: uppercase;
-    letter-spacing: 1px; color: var(--muted); font-weight: 700; white-space: nowrap;
-    cursor: pointer; user-select: none; transition: color .2s;
-  }
-  th:hover { color: var(--text); }
-  th .sort-icon { opacity: 0.4; margin-left: 4px; }
-  th.sorted .sort-icon { opacity: 1; color: var(--gold); }
-  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-  tbody tr:hover { background: var(--surface2); }
-  td { padding: 9px 16px; color: var(--text); white-space: nowrap; }
-  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
-  .badge-pos { background: var(--green-dim); color: var(--green); }
-  .badge-neg { background: var(--red-dim); color: var(--red); }
-  .badge-neu { background: var(--blue-dim); color: var(--blue); }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 3px; overflow: hidden; }
-  .progress-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
-
-  /* ─── LOADING ─── */
-  .loading-overlay {
-    position: fixed; inset: 0; background: var(--bg); z-index: 999;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
-    transition: opacity .4s;
-  }
-  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-  .loader { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-text { color: var(--muted); font-size: 13px; }
-
-  /* ─── TOOLTIP ─── */
-  .tooltip-container { position: relative; }
-  .tooltip-text {
-    visibility: hidden; background: var(--surface2); color: var(--text); border: 1px solid var(--border);
-    padding: 6px 10px; border-radius: var(--radius-sm); font-size: 11px; white-space: nowrap;
-    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-    z-index: 50; box-shadow: var(--shadow); pointer-events: none;
-  }
-  .tooltip-container:hover .tooltip-text { visibility: visible; }
-
-  /* ─── PLATFORM PILLS ─── */
-  .platform-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-  .pill-fb { background: rgba(59,89,152,0.2); color: #7a9fd4; }
-  .pill-ig { background: rgba(195,42,163,0.2); color: #d47ab4; }
-
-  /* ─── SPARKLINE ─── */
-  .mini-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-
-  /* ─── RESPONSIVE ─── */
-  @media (max-width: 900px) {
-    .charts-row-3 { grid-template-columns: 1fr 1fr; }
-    .shift-grid { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 640px) {
-    .charts-row-2, .charts-row-3, .mini-charts-row { grid-template-columns: 1fr; }
-    .header { padding: 0 14px; }
-    .header-title { font-size: 14px; }
-    .main { padding: 14px; }
-    .filters-bar { padding: 10px 14px; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .btn-export span { display: none; }
-  }
-
-  /* ─── ANIMATIONS ─── */
-  .fade-in { animation: fadeIn .4s ease both; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .kpi-card { animation: fadeIn .35s ease both; }
-  .kpi-card:nth-child(2) { animation-delay: .05s; }
-  .kpi-card:nth-child(3) { animation-delay: .10s; }
-  .kpi-card:nth-child(4) { animation-delay: .15s; }
-  .kpi-card:nth-child(5) { animation-delay: .20s; }
-  .kpi-card:nth-child(6) { animation-delay: .25s; }
-
-  /* ─── NO DATA ─── */
-  .no-data { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
-
-  /* ─── LAST UPDATED ─── */
-  #last-updated { font-size: 11px; color: var(--muted); }
-
-  /* ─── PLATFORM FILTER ─── */
-  .platform-filter { display: flex; gap: 6px; }
-  .plat-btn {
-    padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border);
-    background: var(--surface2); color: var(--muted); font-size: 11px; cursor: pointer;
-    font-family: var(--font); transition: all .2s;
-  }
-  .plat-btn.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+footer.foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30px;}
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(245,242,234,.92);z-index:50;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  font-family:var(--font-mono);font-size:13px;color:var(--teal-deep);
+}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--amber);animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.hidden{display:none !important;}
+@media (max-width:640px){
+  .shell{padding:0 14px 50px;}
+  header.top{padding:22px 16px 20px;border-radius:0 0 20px 20px;}
+  .kpi-value{font-size:23px;}
+}
 </style>
 </head>
 <body>
 
-<!-- Loading -->
-<div class="loading-overlay" id="loading">
-  <div class="loader"></div>
-  <div class="loading-text">Fetching live data…</div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div id="loadingText">Pulling the latest sheet data…</div>
 </div>
 
-<div class="app">
-  <!-- Error banner -->
-  <div id="error-banner" style="display:none; background:#e05c6b22; border-bottom:1px solid #e05c6b55; color:#e05c6b; padding:10px 24px; font-size:12px; display:none; align-items:center; gap:12px; flex-wrap:wrap;">
-    <span>⚠️ Could not fetch sheet data. Ensure it is published: <strong>File → Share → Publish to web → Entire Document → CSV → Publish</strong>.</span>
-    <button onclick="fetchData()" style="background:#e05c6b; color:#fff; border:none; padding:4px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-family:inherit;">Retry</button>
-  </div>
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <div class="logo">
-        <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm14 2a4 4 0 110 8 4 4 0 010-8z"/></svg>
+<header class="top">
+  <div class="shell" style="padding:0;">
+    <div class="top-row">
+      <div>
+        <div class="brand-eyebrow">Online Reputation Management</div>
+        <h1 class="brand">Frido</h1>
+        <div class="brand-sub">Live mentions, response times and sentiment across Facebook & Instagram, broken down by shift and agent.</div>
       </div>
-      <div class="header-title">Social <span>Analytics</span> Dashboard</div>
-    </div>
-    <div class="header-right">
-      <div class="refresh-badge">
-        <div class="refresh-dot"></div>
-        <span id="last-updated">Loading…</span>
+      <div class="status-cluster">
+        <div class="live-pill"><span class="dot"></span><span id="lastUpdated">Connecting…</span></div>
+        <button class="refresh-btn" id="refreshBtn">↻ Refresh now</button>
+        <div class="source-link">Manual refresh only</div>
       </div>
-      <button class="btn-export" onclick="exportCSV()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Export CSV</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- Filters -->
-  <div class="filters-bar">
-    <span class="filter-label">Period</span>
-    <div class="filter-btns">
-      <button class="filter-btn active" data-range="today" onclick="setRange('today', this)">Today</button>
-      <button class="filter-btn" data-range="yesterday" onclick="setRange('yesterday', this)">Yesterday</button>
-      <button class="filter-btn" data-range="7d" onclick="setRange('7d', this)">Last 7 Days</button>
-      <button class="filter-btn" data-range="30d" onclick="setRange('30d', this)">Last 30 Days</button>
-      <button class="filter-btn" data-range="all" onclick="setRange('all', this)">All Time</button>
-    </div>
-    <div class="filter-divider"></div>
-    <div class="date-inputs">
-      <input type="date" id="date-from" title="From date">
-      <span>→</span>
-      <input type="date" id="date-to" title="To date">
-      <button class="btn-apply" onclick="applyCustomRange()">Apply</button>
-    </div>
-    <div class="filter-divider"></div>
-    <div class="platform-filter">
-      <button class="plat-btn active" data-plat="all" onclick="setPlatform('all', this)">All Platforms</button>
-      <button class="plat-btn" data-plat="Facebook" onclick="setPlatform('Facebook', this)">Facebook</button>
-      <button class="plat-btn" data-plat="Instagram" onclick="setPlatform('Instagram', this)">Instagram</button>
     </div>
   </div>
+</header>
 
-  <!-- Main -->
-  <main class="main">
+<div class="shell">
 
-    <!-- KPIs -->
-    <div class="section-title">Key Performance Indicators</div>
-    <div class="kpi-grid" id="kpi-grid">
-      <div class="kpi-card gold">
-        <div class="kpi-accent">💬</div>
-        <div class="kpi-label">Total Mentions</div>
-        <div class="kpi-value" id="kpi-mentions">—</div>
-        <div class="kpi-sub">Across all shifts</div>
-      </div>
-      <div class="kpi-card blue">
-        <div class="kpi-accent">📝</div>
-        <div class="kpi-label">Total Comments</div>
-        <div class="kpi-value" id="kpi-comments">—</div>
-        <div class="kpi-sub">FB + Instagram</div>
-      </div>
-      <div class="kpi-card green">
-        <div class="kpi-accent">✅</div>
-        <div class="kpi-label">Reply Rate</div>
-        <div class="kpi-value" id="kpi-reply">—</div>
-        <div class="kpi-sub">All shifts avg</div>
-      </div>
-      <div class="kpi-card purple">
-        <div class="kpi-accent">⚡</div>
-        <div class="kpi-label">Avg FRT + ART</div>
-        <div class="kpi-value" id="kpi-art">—</div>
-        <div class="kpi-sub">Response time</div>
-      </div>
-      <div class="kpi-card red">
-        <div class="kpi-accent">😤</div>
-        <div class="kpi-label">Negative Comments</div>
-        <div class="kpi-value" id="kpi-negative">—</div>
-        <div class="kpi-sub">Needs attention</div>
-      </div>
-      <div class="kpi-card gold">
-        <div class="kpi-accent">🛡️</div>
-        <div class="kpi-label">SLA Breaches</div>
-        <div class="kpi-value" id="kpi-sla">—</div>
-        <div class="kpi-sub">Target: 0</div>
+  <!-- FILTER BAR -->
+  <div class="filterbar" id="filterBar">
+    <div class="filter-group">
+      <span class="filter-label">Date Range</span>
+      <div class="date-inputs" id="customDateInputs">
+        <input type="date" id="dateFrom"> <span style="color:var(--muted);font-size:12px;">to</span> <input type="date" id="dateTo">
       </div>
     </div>
 
-    <!-- Sentiment + Platform charts -->
-    <div class="charts-row charts-row-3">
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Sentiment Analysis</div>
-          <div class="chart-card-badge">Overall</div>
-        </div>
-        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
-          <canvas id="sentimentChart" style="max-height:220px;"></canvas>
-        </div>
-      </div>
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Comments by Platform</div>
-          <div class="chart-card-badge">FB vs IG</div>
-        </div>
-        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
-          <canvas id="platformChart" style="max-height:220px;"></canvas>
-        </div>
-      </div>
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Shift Activity</div>
-          <div class="chart-card-badge">Mentions</div>
-        </div>
-        <div class="chart-wrap" style="height:220px; display:flex; align-items:center; justify-content:center;">
-          <canvas id="shiftChart" style="max-height:220px;"></canvas>
-        </div>
+    <div class="filter-group">
+      <span class="filter-label">Source</span>
+      <div class="chip-row" id="sourceChips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip" data-value="Facebook">Facebook</button>
+        <button class="chip" data-value="Instagram">Instagram</button>
       </div>
     </div>
 
-    <!-- Trend + Sentiment breakdown -->
-    <div class="charts-row charts-row-2">
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Comments Over Time</div>
-          <div class="chart-card-badge">Trend</div>
-        </div>
-        <div class="chart-wrap" style="height:200px;">
-          <canvas id="trendChart" style="max-height:200px;"></canvas>
-        </div>
-      </div>
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Sentiment by Platform</div>
-          <div class="chart-card-badge">Stacked</div>
-        </div>
-        <div class="chart-wrap" style="height:200px;">
-          <canvas id="sentimentPlatformChart" style="max-height:200px;"></canvas>
-        </div>
+    <div class="filter-group">
+      <span class="filter-label">Shift</span>
+      <div class="chip-row" id="shiftChips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip" data-value="Shift 1">Shift 1 · 1–9am</button>
+        <button class="chip" data-value="Shift 2">Shift 2 · 9am–5pm</button>
+        <button class="chip" data-value="Shift 3">Shift 3 · 5pm–1am</button>
       </div>
     </div>
 
-    <!-- Shift breakdown -->
-    <div class="section-title">Shift Performance Breakdown</div>
-    <div class="shift-grid" id="shift-grid">
-      <!-- populated by JS -->
-    </div>
-
-    <!-- Response time chart -->
-    <div class="charts-row charts-row-2" style="margin-bottom:20px;">
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Response Times by Shift</div>
-          <div class="chart-card-badge">FRT · ART</div>
-        </div>
-        <div class="chart-wrap" style="height:200px;">
-          <canvas id="rtChart" style="max-height:200px;"></canvas>
-        </div>
-      </div>
-      <div class="chart-card fade-in">
-        <div class="chart-card-header">
-          <div class="chart-card-title">Negative Sentiment Heatmap</div>
-          <div class="chart-card-badge">By Shift + Platform</div>
-        </div>
-        <div class="chart-wrap" style="height:200px;">
-          <canvas id="negChart" style="max-height:200px;"></canvas>
-        </div>
+    <div class="filter-group">
+      <span class="filter-label">Sentiment</span>
+      <div class="chip-row" id="sentimentChips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip sent-pos" data-value="Positive">Positive</button>
+        <button class="chip sent-neu" data-value="Neutral">Neutral</button>
+        <button class="chip sent-neg" data-value="Negative">Negative</button>
+        <button class="chip sent-mix" data-value="Mixed">Mixed</button>
       </div>
     </div>
 
-    <!-- Data table -->
-    <div class="section-title">Raw Data Explorer</div>
-    <div class="table-card">
-      <div class="table-toolbar">
-        <div class="table-toolbar-title">All Records <span id="row-count" style="color:var(--muted);font-weight:400;font-size:11px;margin-left:6px;"></span></div>
-        <div class="table-controls">
-          <input class="search-input" type="text" placeholder="Search…" id="table-search" oninput="filterTable()">
-          <button class="btn-apply" onclick="exportTableCSV()">↓ CSV</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table id="data-table">
-          <thead id="table-head"></thead>
-          <tbody id="table-body"></tbody>
-        </table>
-      </div>
+    <div class="filter-group">
+      <span class="filter-label">Agent</span>
+      <select id="agentSelect"><option value="all">All agents</option></select>
     </div>
 
-  </main>
+    <div class="filter-spacer"></div>
+    <button class="clear-btn" id="clearFiltersBtn">Clear filters</button>
+  </div>
+
+  <!-- KPI GRID -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- SHIFT BREAKDOWN TABLE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Shift-wise Breakdown</div>
+      <div class="section-note">Mirrors the daily shift report · respects active filters</div>
+    </div>
+    <div class="shift-table-wrap">
+      <table class="shift-table" id="shiftTable"></table>
+    </div>
+  </div>
+
+  <!-- AGENT-WISE BREAKDOWN TABLE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Agent-wise Breakdown</div>
+      <div class="section-note" id="agentTableNote">Respects all active filters</div>
+    </div>
+    <div class="shift-table-wrap">
+      <table class="shift-table" id="agentBreakdownTable" style="min-width:500px;">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Agent Name</th>
+            <th>No. of Tickets</th>
+            <th>FRT</th>
+            <th>ART</th>
+          </tr>
+        </thead>
+        <tbody id="agentBreakdownBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Trends & Distribution</div>
+      <div class="section-note">All charts update live with your filters</div>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Comments over time</h3>
+        <p class="hint">Daily ticket volume in the selected range</p>
+        <div class="chart-canvas-box tall"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Sentiment split</h3>
+        <p class="hint">Share of tickets by sentiment</p>
+        <div class="chart-canvas-box"><canvas id="sentimentChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Source split</h3>
+        <p class="hint">Facebook vs Instagram volume</p>
+        <div class="chart-canvas-box"><canvas id="sourceChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Sentiment by shift</h3>
+        <p class="hint">Stacked tone across the three shifts</p>
+        <div class="chart-canvas-box"><canvas id="shiftSentimentChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Agent leaderboard</h3>
+        <p class="hint">Tickets handled vs SLA breaches, top 10</p>
+        <div class="chart-canvas-box tall"><canvas id="agentChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Response time by shift</h3>
+        <p class="hint">Average FRT vs ART (minutes)</p>
+        <div class="chart-canvas-box"><canvas id="rtChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Ticket Detail</div>
+      <div class="section-note" id="tableCount">0 tickets</div>
+    </div>
+    <div class="table-toolbar">
+      <input type="text" class="search-input" id="tableSearch" placeholder="Search ticket ID, agent, sentiment…">
+      <button class="export-btn" id="exportBtn">⬇ Export CSV</button>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="dataTable">
+        <thead><tr id="dataTableHead"></tr></thead>
+        <tbody id="dataTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer class="foot">Frido — Online Reputation Management · data sourced live from the published Google Sheet · built for shift-by-shift accountability</footer>
 </div>
 
 <script>
-// ─── CONFIG ───────────────────────────────────────────────────────────────
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0uAtEVEbu9Upc3g1otrC7S8pnzn1eQ-Ns1kA-FxyvDrH2gchzOaKrVu0qTx781t04qcTJFHFdMPUD/pub?gid=1548103950&single=true&output=csv';
-const REFRESH_MS = 60_000; // 1 minute
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ__N4oQDh81KS8zX7BC1cpNQIe7dh9gqhgX1XQHqlbepeiLsBpxyK0yg8ZrB_t7hWruEO8y4IX3IMQ/pub?gid=0&single=true&output=csv";
+const AUTO_REFRESH_MS = 60000;
 
-// ─── STATE ────────────────────────────────────────────────────────────────
-let allData = [];
-let filteredData = [];
-let charts = {};
-let currentRange = 'today';
-let currentPlatform = 'all';
-let sortCol = null, sortAsc = true;
-let tableData = [];
-
-// ─── FETCH ────────────────────────────────────────────────────────────────
-// Strategy 1: PapaParse remote download (handles CORS for published sheets)
-// Strategy 2: CORS proxy fallback if strategy 1 fails
-const CORS_PROXY = 'https://corsproxy.io/?';
-
-function fetchData() {
-  updateStatus('Fetching data…');
-  // PapaParse's own XHR download avoids CORS issues for published Google Sheets
-  Papa.parse(SHEET_URL, {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: function(results) {
-      if (results.data && results.data.length > 0) {
-        allData = results.data;
-        updateStatus('Updated: ' + new Date().toLocaleTimeString());
-        applyFilters();
-        hideLoading();
-      } else {
-        console.warn('PapaParse returned empty data, trying CORS proxy…');
-        fetchWithProxy();
-      }
-    },
-    error: function(err) {
-      console.warn('PapaParse download failed, trying CORS proxy…', err);
-      fetchWithProxy();
-    }
-  });
-}
-
-async function fetchWithProxy() {
-  try {
-    const url = CORS_PROXY + encodeURIComponent(SHEET_URL);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-    if (parsed.data && parsed.data.length > 0) {
-      allData = parsed.data;
-      updateStatus('Updated (proxy): ' + new Date().toLocaleTimeString());
-      document.getElementById('error-banner').style.display = 'none';
-      applyFilters();
-    } else {
-      showError();
-      updateStatus('⚠️ Sheet returned no data');
-    }
-  } catch (e) {
-    console.error('Proxy fetch also failed:', e);
-    showError();
-    updateStatus('⚠️ Cannot reach sheet');
-  } finally {
-    hideLoading();
-  }
-}
-
-function showError() {
-  const b = document.getElementById('error-banner');
-  b.style.display = 'flex';
-}
-
-function updateStatus(msg) {
-  document.getElementById('last-updated').textContent = msg;
-}
-
-function hideLoading() {
-  document.getElementById('loading').classList.add('hidden');
-}
-
-// ─── DATE UTILS ───────────────────────────────────────────────────────────
-function parseDate(str) {
-  if (!str) return null;
-  // Try multiple formats
-  const d = new Date(str);
-  if (!isNaN(d)) return d;
-  // Try DD/MM/YYYY
-  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m) return new Date(`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
-  return null;
-}
-
-function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
-function yesterday() { const d = today(); d.setDate(d.getDate()-1); return d; }
-function daysAgo(n) { const d = today(); d.setDate(d.getDate()-n); return d; }
-
-// ─── FILTER LOGIC ─────────────────────────────────────────────────────────
-function setRange(range, btn) {
-  currentRange = range;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  applyFilters();
-}
-
-function setPlatform(plat, btn) {
-  currentPlatform = plat;
-  document.querySelectorAll('.plat-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  applyFilters();
-}
-
-function applyCustomRange() {
-  const from = document.getElementById('date-from').value;
-  const to = document.getElementById('date-to').value;
-  if (!from && !to) return;
-  currentRange = `custom:${from}:${to}`;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  applyFilters();
-}
-
-function getDateFilter() {
-  const t = today(), y = yesterday();
-  if (currentRange === 'today') return row => { const d = getRowDate(row); return d && d >= t; };
-  if (currentRange === 'yesterday') return row => { const d = getRowDate(row); return d && d >= y && d < t; };
-  if (currentRange === '7d') return row => { const d = getRowDate(row); return d && d >= daysAgo(7); };
-  if (currentRange === '30d') return row => { const d = getRowDate(row); return d && d >= daysAgo(30); };
-  if (currentRange.startsWith('custom:')) {
-    const [, from, to] = currentRange.split(':');
-    const fd = from ? new Date(from) : null;
-    const td = to ? new Date(to) : null;
-    if (td) td.setHours(23,59,59,999);
-    return row => {
-      const d = getRowDate(row);
-      if (!d) return true;
-      if (fd && d < fd) return false;
-      if (td && d > td) return false;
-      return true;
-    };
-  }
-  return () => true; // all
-}
-
-function getRowDate(row) {
-  // Try to find a date column (Date, date, Timestamp, etc.)
-  const keys = Object.keys(row);
-  for (const k of keys) {
-    if (/date|time|stamp/i.test(k)) {
-      return parseDate(row[k]);
-    }
-  }
-  return null;
-}
-
-function getPlatformFilter() {
-  if (currentPlatform === 'all') return () => true;
-  return row => {
-    const keys = Object.keys(row);
-    for (const k of keys) {
-      if (/platform|source|channel/i.test(k)) {
-        return row[k].trim().toLowerCase() === currentPlatform.toLowerCase();
-      }
-    }
-    return true;
-  };
-}
-
-function applyFilters() {
-  const dateF = getDateFilter();
-  const platF = getPlatformFilter();
-  filteredData = allData.filter(row => dateF(row) && platF(row));
-  render();
-}
-
-// ─── COLUMN DETECTION ─────────────────────────────────────────────────────
-function findCol(row, patterns) {
-  const keys = Object.keys(row);
-  for (const p of patterns) {
-    const k = keys.find(k => new RegExp(p,'i').test(k));
-    if (k) return k;
-  }
-  return null;
-}
-
-function getVal(row, patterns, fallback='') {
-  const k = findCol(row, patterns);
-  return k ? (row[k] || fallback) : fallback;
-}
-
-function numVal(row, patterns) {
-  const v = getVal(row, patterns, '0');
-  return parseFloat(v.toString().replace(/[^0-9.\-]/g,'')) || 0;
-}
-
-// ─── RENDER ───────────────────────────────────────────────────────────────
-function render() {
-  if (!allData.length) return;
-  const data = filteredData.length ? filteredData : allData;
-  renderKPIs(data);
-  renderShifts(data);
-  renderCharts(data);
-  renderTable(data);
-}
-
-// ─── KPIs ─────────────────────────────────────────────────────────────────
-function renderKPIs(data) {
-  const totalMentions = data.reduce((s,r) => s + numVal(r,['mention','mentions']), 0);
-  const totalComments = data.reduce((s,r) => s + numVal(r,['comment','comments','total.*comment']), 0);
-  const negativeSum = data.reduce((s,r) => s + numVal(r,['negative']), 0);
-  const slaBreaches = data.reduce((s,r) => s + numVal(r,['sla.*breach','breach']), 0);
-
-  // Reply rate avg
-  const rr = data.map(r => numVal(r,['reply.*rate','rate'])).filter(v => v > 0);
-  const avgRR = rr.length ? (rr.reduce((s,v)=>s+v,0)/rr.length) : 100;
-
-  // Response times (parse "X MINS Y SECS")
-  function parseMinSec(str) {
-    if (!str) return 0;
-    const m = str.toString().match(/(\d+)\s*MIN[S]?\s*(\d+)?\s*SEC/i);
-    if (m) return parseInt(m[1])*60 + (parseInt(m[2])||0);
-    const m2 = str.toString().match(/(\d+)\s*MIN/i);
-    if (m2) return parseInt(m2[1])*60;
-    return 0;
-  }
-  const artVals = data.map(r => parseMinSec(getVal(r,['avg.*frt.*art','avg.*art','art']))).filter(v=>v>0);
-  const avgRT = artVals.length ? Math.round(artVals.reduce((s,v)=>s+v,0)/artVals.length) : 0;
-  const rtStr = avgRT ? `${Math.floor(avgRT/60)}m ${avgRT%60}s` : '—';
-
-  // Use fallback from screenshot if data doesn't have those fields
-  const mentions = totalMentions || data.reduce((s,r) => s + numVal(r,['all.*mention','total.*mention']), 0);
-  const comments = totalComments || data.length;
-
-  document.getElementById('kpi-mentions').textContent = mentions > 0 ? mentions.toLocaleString() : (filteredData.length || allData.length).toLocaleString();
-  document.getElementById('kpi-comments').textContent = comments > 0 ? comments.toLocaleString() : '—';
-  document.getElementById('kpi-reply').textContent = avgRR > 0 ? Math.round(avgRR)+'%' : '100%';
-  document.getElementById('kpi-art').textContent = rtStr;
-  document.getElementById('kpi-negative').textContent = negativeSum > 0 ? negativeSum.toLocaleString() : '—';
-  document.getElementById('kpi-sla').textContent = slaBreaches.toLocaleString();
-}
-
-// ─── SHIFTS ───────────────────────────────────────────────────────────────
-const SHIFT_DEFS = [
-  { name: 'Shift 1', time: '9am – 5pm', key: ['shift.*1','shift1'] },
-  { name: 'Shift 2', time: '5pm – 1am', key: ['shift.*2','shift2'] },
-  { name: 'Shift 3', time: '1am – 9am', key: ['shift.*3','shift3'] },
-];
-
-// Build static shift data from screenshots as fallback
-const STATIC_SHIFTS = [
-  {
-    name:'Shift 1', time:'9am – 5pm',
-    mentions:1416, fbComments:109, igComments:354,
-    positive:21, negative:125, neutral:317,
-    frt:'2m 2s', art:'2m 13s', avgFrtArt:'2m 8s', sla:0, replyRate:'100%'
-  },
-  {
-    name:'Shift 2', time:'5pm – 1am',
-    mentions:1506, fbComments:124, igComments:582,
-    positive:18, negative:73, neutral:615,
-    frt:'2m 53s', art:'2m 50s', avgFrtArt:'2m 52s', sla:0, replyRate:'100%'
-  },
-  {
-    name:'Shift 3', time:'1am – 9am',
-    mentions:226, fbComments:33, igComments:67,
-    positive:14, negative:15, neutral:71,
-    frt:'2m 2s', art:'1m 55s', avgFrtArt:'1m 59s', sla:0, replyRate:'100%'
-  },
-];
-
-function renderShifts(data) {
-  const grid = document.getElementById('shift-grid');
-  const shifts = STATIC_SHIFTS; // use static from screenshot; extend to parse data when live columns are mapped
-
-  grid.innerHTML = shifts.map((s,i) => `
-    <div class="shift-card fade-in" style="animation-delay:${i*0.1}s">
-      <div class="shift-header">
-        <div class="shift-name">${s.name}</div>
-        <div class="shift-time">${s.time}</div>
-      </div>
-      <div class="shift-body">
-        <div class="shift-row"><span class="shift-key">All Mentions</span><span class="shift-val gold">${s.mentions.toLocaleString()}</span></div>
-        <div class="shift-row"><span class="shift-key">FB Comments</span><span class="shift-val">${s.fbComments}</span></div>
-        <div class="shift-row"><span class="shift-key">IG Comments</span><span class="shift-val">${s.igComments}</span></div>
-        <div class="shift-row"><span class="shift-key">Positive</span><span class="shift-val pos">+${s.positive}</span></div>
-        <div class="shift-row"><span class="shift-key">Negative</span><span class="shift-val neg">-${s.negative}</span></div>
-        <div class="shift-row"><span class="shift-key">Neutral</span><span class="shift-val">${s.neutral}</span></div>
-        <div class="shift-row"><span class="shift-key">FRT</span><span class="shift-val">${s.frt}</span></div>
-        <div class="shift-row"><span class="shift-key">ART</span><span class="shift-val">${s.art}</span></div>
-        <div class="shift-row"><span class="shift-key">Avg FRT+ART</span><span class="shift-val gold">${s.avgFrtArt}</span></div>
-        <div class="shift-row"><span class="shift-key">SLA Breach</span><span class="shift-val ${s.sla>0?'neg':'pos'}">${s.sla}</span></div>
-        <div class="shift-row"><span class="shift-key">Reply Rate</span><span class="shift-val pos">${s.replyRate}</span></div>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ─── CHARTS ───────────────────────────────────────────────────────────────
-const C = {
-  gold: '#f5c518', blue: '#4ea8de', green: '#43c98a',
-  red: '#e05c6b', purple: '#a78bfa', muted: '#8892b0',
-  surface2: '#22263a', border: '#2e3247', text: '#e8eaf6'
+const COLS = {
+  date: "Date",
+  source: "Source Type",
+  ticket: "Ticket ID",
+  agent: "First Assignment to Agent Name",
+  agentDt: "First Assignment to Agent DateTime",
+  latestResp: "Latest Response to Customer DateTime",
+  lastActionBy: "Last Action Taken By",
+  lastActionDt: "Last Action Taken on Ticket - Date/Time",
+  lastActionAgent: "Last action by agent Name",
+  location: "Location Name",
+  totalTAT: "Total TAT",
+  workingTAT: "Working TAT Seconds",
+  sentiment: "Sentiment",
+  sla: "SLA Breach Flag",
+  firstRespDt: "First Level Response to Customer DateTime",
+  frt: "First Level Response TAT"
 };
 
-function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+let RAW = [];        // parsed raw rows
+let STATE = {
+  dateFrom: null,
+  dateTo: null,
+  source: "all",
+  shift: "all",
+  sentiment: "all",
+  agent: "all",
+  sortCol: COLS.date,
+  sortDir: "desc",
+  search: ""
+};
+let CHARTS = {};
 
-function renderCharts(data) {
-  renderSentimentChart();
-  renderPlatformChart();
-  renderShiftChart();
-  renderTrendChart(data);
-  renderSentimentPlatformChart();
-  renderRTChart();
-  renderNegChart();
-}
+/* ============================================================
+   HELPERS — parsing
+   ============================================================ */
+function parseDate(val){
+  if(!val) return null;
+  if(val instanceof Date) return isNaN(val) ? null : val;
+  const s = String(val).trim();
+  if(!s) return null;
 
-function renderSentimentChart() {
-  destroyChart('sentiment');
-  const ctx = document.getElementById('sentimentChart').getContext('2d');
-  // From screenshot: Positive 5%, Negative 17%, Neutral 78%
-  // Total comments: FB(109+124+33=266) + IG(354+582+67=1003) = 1269
-  const pos = 21+18+14; const neg = 125+73+15; const neu = 317+615+71;
-  charts.sentiment = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Positive', 'Negative', 'Neutral'],
-      datasets: [{ data: [pos, neg, neu], backgroundColor: [C.green, C.red, C.blue], borderWidth: 3, borderColor: '#1a1d27', hoverOffset: 8 }]
-    },
-    options: {
-      cutout: '65%', responsive: true, maintainAspectRatio: true,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, padding: 14, boxWidth: 10, usePointStyle: true } },
-        tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted,
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${Math.round(ctx.parsed/(pos+neg+neu)*100)}%)` }
-        }
-      }
+  // Primary format used by this sheet: DD-MM-YYYY HH:MM:SS (e.g. 28-06-2026 09:41:21)
+  let m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(m){
+    const [, dd, mo, yr, hh, mi, ss] = m;
+    const d = new Date(+yr, +mo-1, +dd, +hh, +mi, +(ss||0));
+    if(!isNaN(d)) return d;
+  }
+  // Same format, date only: DD-MM-YYYY
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m){
+    const [, dd, mo, yr] = m;
+    const d = new Date(+yr, +mo-1, +dd);
+    if(!isNaN(d)) return d;
+  }
+
+  // Generic JS-parseable formats (ISO, M/D/YYYY, etc.)
+  let d = new Date(s);
+  if(!isNaN(d)) return d;
+
+  // Fallback: D/M/YYYY or D-M-YYYY H:MM[:SS] [AM/PM] with slashes
+  m = s.match(/(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})[, ]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
+  if(m){
+    let [, mo, da, yr, hh, mi, ss, ap] = m;
+    yr = yr.length===2 ? "20"+yr : yr;
+    hh = parseInt(hh,10);
+    if(ap){
+      if(/PM/i.test(ap) && hh<12) hh+=12;
+      if(/AM/i.test(ap) && hh===12) hh=0;
     }
-  });
+    d = new Date(yr, mo-1, da, hh, mi||0, ss||0);
+    if(!isNaN(d)) return d;
+  }
+  return null;
 }
 
-function renderPlatformChart() {
-  destroyChart('platform');
-  const ctx = document.getElementById('platformChart').getContext('2d');
-  const fbTotal = 109+124+33;
-  const igTotal = 354+582+67;
-  charts.platform = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Facebook', 'Instagram'],
-      datasets: [{ data: [fbTotal, igTotal], backgroundColor: ['#3b5998cc','#c32aa3cc'], borderWidth: 3, borderColor: '#1a1d27', hoverOffset: 8 }]
-    },
-    options: {
-      cutout: '65%', responsive: true, maintainAspectRatio: true,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: C.muted, font: { size: 11 }, padding: 14, boxWidth: 10, usePointStyle: true } },
-        tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted,
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${Math.round(ctx.parsed/(fbTotal+igTotal)*100)}%)` }
-        }
-      }
-    }
-  });
+// duration field -> seconds. Accepts plain seconds, "H:MM:SS", or "X mins Y secs" style strings.
+function parseDurationSeconds(val){
+  if(val===undefined || val===null || val==="") return null;
+  if(typeof val === "number") return val;
+  const s = String(val).trim();
+  if(!s) return null;
+  if(/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  if(/^\d{1,3}:\d{2}(:\d{2})?$/.test(s)){
+    const parts = s.split(":").map(Number);
+    if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+    return parts[0]*60+parts[1];
+  }
+  let total = 0; let matched = false;
+  const hr = s.match(/(\d+(\.\d+)?)\s*h/i);
+  const mn = s.match(/(\d+(\.\d+)?)\s*m/i);
+  const sc = s.match(/(\d+(\.\d+)?)\s*s/i);
+  if(hr){ total += parseFloat(hr[1])*3600; matched=true; }
+  if(mn){ total += parseFloat(mn[1])*60; matched=true; }
+  if(sc){ total += parseFloat(sc[1]); matched=true; }
+  return matched ? total : null;
 }
 
-function renderShiftChart() {
-  destroyChart('shift');
-  const ctx = document.getElementById('shiftChart').getContext('2d');
-  charts.shift = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Shift 1\n9am-5pm', 'Shift 2\n5pm-1am', 'Shift 3\n1am-9am'],
-      datasets: [{ label: 'All Mentions', data: [1416, 1506, 226], backgroundColor: [C.gold+'cc', C.blue+'cc', C.purple+'cc'], borderRadius: 6, borderSkipped: false }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
-      scales: {
-        x: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } },
-        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
-      }
-    }
-  });
+function fmtDuration(totalSeconds){
+  if(totalSeconds===null || totalSeconds===undefined || isNaN(totalSeconds)) return "—";
+  const s = Math.round(totalSeconds);
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = s%60;
+  if(h>0) return `${h} HR ${m} MIN ${sec} SEC`;
+  if(m>0) return `${m} MIN ${sec} SEC`;
+  return `${sec} SEC`;
 }
 
-function renderTrendChart(data) {
-  destroyChart('trend');
-  const ctx = document.getElementById('trendChart').getContext('2d');
+function getSourceGroup(sourceType){
+  const s = (sourceType||"").toLowerCase().trim();
+  if(s.includes("instagram")) return "Instagram";
+  if(s.includes("facebook") || /\bfb\b/.test(s) || s.startsWith("fb")) return "Facebook";
+  return "Other";
+}
 
-  // Try to parse date-based trend from data; fallback to sample
-  let labels = [], vals = [];
-  if (data.length > 2) {
-    const byDate = {};
-    data.forEach(row => {
-      const d = getRowDate(row);
-      if (d) {
-        const key = d.toLocaleDateString('en-GB', {day:'2-digit',month:'short'});
-        byDate[key] = (byDate[key]||0) + 1;
-      }
+// Shift 1: 1:00am–9:00am · Shift 2: 9:00:01am–5:00pm · Shift 3: 5:00:01pm–12:59:59am (next calendar day)
+// The post-midnight slice (12:00am–12:59:59am) belongs to the PREVIOUS day's Shift 3.
+function getShiftInfo(date){
+  if(!date) return {shift:"Unknown", businessDate:null};
+  const totalSec = date.getHours()*3600 + date.getMinutes()*60 + date.getSeconds();
+  const calDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if(totalSec < 3600){ // 00:00:00–00:59:59 -> tail end of previous day's Shift 3
+    const businessDate = new Date(calDate); businessDate.setDate(businessDate.getDate()-1);
+    return {shift:"Shift 3", businessDate};
+  }
+  if(totalSec <= 32400){ // up to and including 09:00:00
+    return {shift:"Shift 1", businessDate:calDate};
+  }
+  if(totalSec <= 61200){ // up to and including 17:00:00
+    return {shift:"Shift 2", businessDate:calDate};
+  }
+  return {shift:"Shift 3", businessDate:calDate}; // 17:00:01–23:59:59
+}
+
+function dateKey(d){
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+/* ============================================================
+   LOAD + TRANSFORM
+   ============================================================ */
+function loadData(isManual){
+  document.getElementById("loadingText").textContent = isManual ? "Refreshing from sheet…" : "Pulling the latest sheet data…";
+  document.getElementById("loadingOverlay").classList.remove("hidden");
+
+  const urlsToTry = [
+    CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(),
+    "https://corsproxy.io/?" + encodeURIComponent(CSV_URL)
+  ];
+
+  fetchFirstWorking(urlsToTry)
+    .then(text=>{
+      const res = Papa.parse(text, {header:true, skipEmptyLines:true});
+      RAW = transform(res.data);
+      populateAgentOptions();
+      renderAll();
+      document.getElementById("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+      document.getElementById("loadingOverlay").classList.add("hidden");
+    })
+    .catch(err=>{
+      console.error("Sheet load failed:", err);
+      document.getElementById("loadingText").textContent =
+        "Couldn't reach the Google Sheet (" + (err.message || err) + "). " +
+        "If you're opening this file directly from your computer, try hosting it on a web server instead — browsers block this kind of request from a local file. Retrying…";
+      document.getElementById("loadingOverlay").classList.remove("hidden");
     });
-    const sorted = Object.entries(byDate).sort((a,b) => new Date(a[0])-new Date(b[0]));
-    if (sorted.length > 1) { labels = sorted.map(e=>e[0]); vals = sorted.map(e=>e[1]); }
+}
+
+async function fetchFirstWorking(urls){
+  let lastErr;
+  for(const url of urls){
+    try{
+      const resp = await fetch(url, {cache:"no-store"});
+      if(!resp.ok) throw new Error("HTTP " + resp.status);
+      const text = await resp.text();
+      if(!text || text.trim().length===0) throw new Error("Empty response");
+      return text;
+    }catch(e){
+      lastErr = e;
+    }
   }
-  if (!labels.length) {
-    // sample trend (last 7 days dummy)
-    for (let i=6;i>=0;i--) { const d=daysAgo(i); labels.push(d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})); }
-    vals = [312,445,389,501,430,290,411];
+  throw lastErr || new Error("Unknown fetch error");
+}
+
+function transform(rows){
+  return rows.filter(r=>r[COLS.ticket] && String(r[COLS.ticket]).trim()!=="").map(r=>{
+    const dt = parseDate(r[COLS.date]);
+    const firstRespDt = parseDate(r[COLS.firstRespDt]);
+    const frtSec = parseDurationSeconds(r[COLS.frt]);
+    const artSec = parseDurationSeconds(r[COLS.workingTAT]) ?? parseDurationSeconds(r[COLS.totalTAT]);
+    const shiftInfo = getShiftInfo(dt);
+    return {
+      ticket: r[COLS.ticket],
+      date: dt,
+      businessDate: shiftInfo.businessDate,
+      dayKey: shiftInfo.businessDate ? dateKey(shiftInfo.businessDate) : null,
+      sourceRaw: r[COLS.source] || "",
+      sourceGroup: getSourceGroup(r[COLS.source]),
+      shift: shiftInfo.shift,
+      agent: (r[COLS.agent] || "Unassigned").trim() || "Unassigned",
+      sentiment: (r[COLS.sentiment] || "Unspecified").trim() || "Unspecified",
+      sla: (r[COLS.sla]||"").trim().toLowerCase()==="yes",
+      frtSec: frtSec,
+      artSec: artSec,
+      firstRespDt: firstRespDt,
+      hasReply: !!(r[COLS.firstRespDt] && String(r[COLS.firstRespDt]).trim()!=="")
+    };
+  });
+}
+
+function populateAgentOptions(){
+  const sel = document.getElementById("agentSelect");
+  const current = sel.value;
+  const agents = [...new Set(RAW.map(r=>r.agent))].sort();
+  sel.innerHTML = '<option value="all">All agents</option>' + agents.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+  if(agents.includes(current)) sel.value = current;
+}
+
+/* ============================================================
+   FILTERING
+   ============================================================ */
+// Filters against each row's businessDate, so the post-midnight tail of Shift 3
+// (12:00am–12:59am) stays grouped with the day its shift started on.
+function inDateRange(actualDate){
+  if(!STATE.dateFrom && !STATE.dateTo) return true; // no custom range selected -> show all
+  if(!actualDate) return false;
+  const calDate = new Date(actualDate.getFullYear(), actualDate.getMonth(), actualDate.getDate());
+  if(STATE.dateFrom){
+    const from = new Date(STATE.dateFrom.getFullYear(), STATE.dateFrom.getMonth(), STATE.dateFrom.getDate());
+    if(calDate < from) return false;
   }
-
-  charts.trend = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{ label: 'Comments', data: vals, borderColor: C.gold, backgroundColor: C.gold+'22', fill: true, tension: 0.4, pointBackgroundColor: C.gold, pointRadius: 3, pointHoverRadius: 6 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
-      scales: {
-        x: { ticks: { color: C.muted, font: { size: 10 }, maxRotation: 0 }, grid: { color: C.border } },
-        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
-      }
-    }
-  });
-}
-
-function renderSentimentPlatformChart() {
-  destroyChart('sentimentPlatform');
-  const ctx = document.getElementById('sentimentPlatformChart').getContext('2d');
-  charts.sentimentPlatform = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Facebook', 'Instagram'],
-      datasets: [
-        { label: 'Positive', data: [15, 38], backgroundColor: C.green+'cc', borderRadius: 4 },
-        { label: 'Negative', data: [56, 157], backgroundColor: C.red+'cc', borderRadius: 4 },
-        { label: 'Neutral', data: [195, 807], backgroundColor: C.blue+'cc', borderRadius: 4 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
-      scales: {
-        x: { stacked: true, ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
-        y: { stacked: true, ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
-      }
-    }
-  });
-}
-
-function renderRTChart() {
-  destroyChart('rt');
-  const ctx = document.getElementById('rtChart').getContext('2d');
-  // Convert to seconds: 2m2s=122, 2m13s=133, 2m53s=173, 2m50s=170, 2m2s=122, 1m55s=115
-  charts.rt = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Shift 1', 'Shift 2', 'Shift 3'],
-      datasets: [
-        { label: 'FRT (secs)', data: [122, 173, 122], backgroundColor: C.blue+'cc', borderRadius: 4 },
-        { label: 'ART (secs)', data: [133, 170, 115], backgroundColor: C.purple+'cc', borderRadius: 4 },
-        { label: 'Avg FRT+ART (secs)', data: [128, 172, 119], backgroundColor: C.gold+'cc', borderRadius: 4 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Math.floor(ctx.parsed.y/60)}m ${ctx.parsed.y%60}s` } } },
-      scales: {
-        x: { ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
-        y: { ticks: { color: C.muted, font: { size: 10 }, callback: v => `${Math.floor(v/60)}m` }, grid: { color: C.border } }
-      }
-    }
-  });
-}
-
-function renderNegChart() {
-  destroyChart('neg');
-  const ctx = document.getElementById('negChart').getContext('2d');
-  charts.neg = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Shift 1', 'Shift 2', 'Shift 3'],
-      datasets: [
-        { label: 'Facebook', data: [28, 25, 3], backgroundColor: '#3b5998cc', borderRadius: 4 },
-        { label: 'Instagram', data: [97, 48, 12], backgroundColor: '#c32aa3cc', borderRadius: 4 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: C.muted, font: { size: 10 }, boxWidth: 10, usePointStyle: true } }, tooltip: { backgroundColor: C.surface2, borderColor: C.border, borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
-      scales: {
-        x: { ticks: { color: C.muted, font: { size: 11 } }, grid: { color: C.border } },
-        y: { ticks: { color: C.muted, font: { size: 10 } }, grid: { color: C.border } }
-      }
-    }
-  });
-}
-
-// ─── TABLE ────────────────────────────────────────────────────────────────
-function renderTable(data) {
-  if (!data.length) { document.getElementById('table-body').innerHTML = '<tr><td colspan="99" class="no-data">No data for selected filters</td></tr>'; return; }
-  const cols = Object.keys(data[0]);
-  tableData = data;
-  document.getElementById('row-count').textContent = `(${data.length.toLocaleString()} rows)`;
-
-  // Head
-  document.getElementById('table-head').innerHTML = `<tr>${cols.map(c => `<th onclick="sortTable('${c}')" class="${sortCol===c?'sorted':''}">
-    ${c} <span class="sort-icon">${sortCol===c?(sortAsc?'▲':'▼'):'⇅'}</span>
-  </th>`).join('')}</tr>`;
-
-  filterTable();
-}
-
-function filterTable() {
-  const q = document.getElementById('table-search').value.toLowerCase();
-  const data = q ? tableData.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))) : tableData;
-  const cols = tableData.length ? Object.keys(tableData[0]) : [];
-  const MAX = 200;
-  document.getElementById('table-body').innerHTML = data.slice(0, MAX).map(row => `
-    <tr>${cols.map(c => {
-      const v = row[c] || '';
-      if (/positive/i.test(c)) return `<td><span class="badge badge-pos">😊 ${v}</span></td>`;
-      if (/negative/i.test(c)) return `<td><span class="badge badge-neg">😡 ${v}</span></td>`;
-      if (/neutral/i.test(c)) return `<td><span class="badge badge-neu">😐 ${v}</span></td>`;
-      if (/platform|source/i.test(c)) return `<td><span class="platform-pill ${v.toLowerCase().includes('face')?'pill-fb':'pill-ig'}">${v}</span></td>`;
-      return `<td>${v}</td>`;
-    }).join('')}</tr>
-  `).join('') || '<tr><td colspan="99" class="no-data">No matching records</td></tr>';
-  if (data.length > MAX) {
-    document.getElementById('table-body').innerHTML += `<tr><td colspan="${cols.length}" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">Showing first ${MAX} of ${data.length} rows. Use search to narrow down.</td></tr>`;
+  if(STATE.dateTo){
+    const to = new Date(STATE.dateTo.getFullYear(), STATE.dateTo.getMonth(), STATE.dateTo.getDate());
+    if(calDate > to) return false;
   }
+  return true;
 }
 
-function sortTable(col) {
-  if (sortCol === col) sortAsc = !sortAsc;
-  else { sortCol = col; sortAsc = true; }
-  tableData.sort((a, b) => {
-    const av = a[col]||'', bv = b[col]||'';
-    const an = parseFloat(av), bn = parseFloat(bv);
-    if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an-bn : bn-an;
-    return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+function getFiltered(){
+  return RAW.filter(r=>{
+    if(!inDateRange(r.date)) return false;
+    if(STATE.source!=="all" && r.sourceGroup!==STATE.source) return false;
+    if(STATE.shift!=="all" && r.shift!==STATE.shift) return false;
+    if(STATE.sentiment!=="all" && r.sentiment!==STATE.sentiment) return false;
+    if(STATE.agent!=="all" && r.agent!==STATE.agent) return false;
+    return true;
   });
-  renderTable(tableData);
 }
 
-// ─── EXPORT ───────────────────────────────────────────────────────────────
-function exportCSV() {
-  const csv = Papa.unparse(allData);
-  download('social_analytics_all.csv', csv);
-}
-function exportTableCSV() {
-  const csv = Papa.unparse(tableData);
-  download('social_analytics_filtered.csv', csv);
-}
-function download(filename, text) {
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
-  a.download = filename; a.click();
+/* ============================================================
+   METRIC COMPUTATION
+   ============================================================ */
+function uniqueTicketCount(rows){
+  return new Set(rows.map(r=>r.ticket)).size;
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────
-fetchData();
-setInterval(fetchData, REFRESH_MS);
+function computeMetrics(rows){
+  const total = uniqueTicketCount(rows);
+  const fb = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="Facebook"));
+  const ig = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="Instagram"));
+  const pos = uniqueTicketCount(rows.filter(r=>r.sentiment==="Positive"));
+  const neg = uniqueTicketCount(rows.filter(r=>r.sentiment==="Negative"));
+  const neu = uniqueTicketCount(rows.filter(r=>r.sentiment==="Neutral"));
+  const mix = uniqueTicketCount(rows.filter(r=>r.sentiment==="Mixed"));
+  const frtVals = rows.map(r=>r.frtSec).filter(v=>v!==null && v!==undefined);
+  const artVals = rows.map(r=>r.artSec).filter(v=>v!==null && v!==undefined);
+  const avgFrt = frtVals.length ? frtVals.reduce((a,b)=>a+b,0)/frtVals.length : null;
+  const avgArt = artVals.length ? artVals.reduce((a,b)=>a+b,0)/artVals.length : null;
+  const sumFrtArt = (avgFrt!==null && avgArt!==null) ? avgFrt+avgArt : null;
+  const combinedPerTicket = rows.map(r=>{
+    if(r.frtSec!==null && r.artSec!==null) return r.frtSec + r.artSec;
+    return null;
+  }).filter(v=>v!==null);
+  const avgCombined = combinedPerTicket.length ? combinedPerTicket.reduce((a,b)=>a+b,0)/combinedPerTicket.length : null;
+  const slaBreach = uniqueTicketCount(rows.filter(r=>r.sla));
+  const replied = uniqueTicketCount(rows.filter(r=>r.hasReply));
+  const replyRate = total ? (replied/total*100) : 0;
+  return {total, fb, ig, pos, neg, neu, mix, avgFrt, avgArt, sumFrtArt, avgCombined, slaBreach, replied, replyRate};
+}
 
-// Set default date inputs
-const today_str = new Date().toISOString().split('T')[0];
-const month_ago = new Date(Date.now()-30*864e5).toISOString().split('T')[0];
-document.getElementById('date-from').value = month_ago;
-document.getElementById('date-to').value = today_str;
+/* ============================================================
+   RENDER — KPI cards
+   ============================================================ */
+function renderKpis(m){
+  const cards = [
+    {label:"Total Comments", value:m.total.toLocaleString(), sub:"matching current filters", cls:""},
+    {label:"Facebook", value:m.fb.toLocaleString(), sub: m.total? (m.fb/m.total*100).toFixed(1)+"% of comments":"—", cls:""},
+    {label:"Instagram", value:m.ig.toLocaleString(), sub: m.total? (m.ig/m.total*100).toFixed(1)+"% of comments":"—", cls:"amber"},
+    {label:"Positive", value:m.pos.toLocaleString(), sub: m.total? (m.pos/m.total*100).toFixed(1)+"% positive":"—", cls:"pos"},
+    {label:"Negative", value:m.neg.toLocaleString(), sub: m.total? (m.neg/m.total*100).toFixed(1)+"% negative":"—", cls:"neg"},
+    {label:"Avg FRT", value: fmtDuration(m.avgFrt), sub:"first response time", cls:""},
+    {label:"Avg ART", value: fmtDuration(m.avgArt), sub:"avg response time", cls:""},
+    {label:"Avg FRT + ART", value: fmtDuration(m.avgCombined), sub:"combined per ticket", cls:"amber"},
+    {label:"SLA Breaches", value:m.slaBreach.toLocaleString(), sub: m.total? (m.slaBreach/m.total*100).toFixed(1)+"% breach rate":"—", cls:"coral"},
+    {label:"Reply Rate", value: m.replyRate.toFixed(1)+"%", sub: m.replied+" of "+m.total+" replied", cls:"pos"},
+  ];
+  document.getElementById("kpiGrid").innerHTML = cards.map((c,i)=>`
+    <div class="kpi-card ${c.cls}" style="animation-delay:${i*30}ms">
+      <div class="bar"></div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      <div class="kpi-sub">${c.sub}</div>
+    </div>`).join("");
+}
+
+/* ============================================================
+   RENDER — Shift breakdown table (recreates screenshot)
+   ============================================================ */
+function renderShiftTable(rows){
+  const shifts = ["Shift 1","Shift 2","Shift 3"];
+  const shiftLabels = {"Shift 1":"1AM–9AM","Shift 2":"9AM–5PM","Shift 3":"5PM–1AM"};
+  const data = {};
+  shifts.forEach(s=>{
+    const sr = rows.filter(r=>r.shift===s);
+    data[s] = {
+      m: computeMetrics(sr),
+      igMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="Instagram")),
+      fbMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="Facebook")),
+    };
+  });
+
+  const rowsDef = [
+    {label:"Total Comments", get:s=>data[s].m.total.toLocaleString()},
+    {group:"Facebook"},
+    {label:"Total no. of Comments", get:s=>data[s].fbMetrics.total.toLocaleString()},
+    {label:"Positive", get:s=>data[s].fbMetrics.pos.toLocaleString()},
+    {label:"Negative", get:s=>data[s].fbMetrics.neg.toLocaleString()},
+    {label:"Neutral", get:s=>data[s].fbMetrics.neu.toLocaleString()},
+    {group:"Instagram"},
+    {label:"Total no. of Comments", get:s=>data[s].igMetrics.total.toLocaleString()},
+    {label:"Positive", get:s=>data[s].igMetrics.pos.toLocaleString()},
+    {label:"Negative", get:s=>data[s].igMetrics.neg.toLocaleString()},
+    {label:"Neutral", get:s=>data[s].igMetrics.neu.toLocaleString()},
+    {sep:true},
+    {label:"FRT", get:s=>fmtDuration(data[s].m.avgFrt)},
+    {label:"ART", get:s=>fmtDuration(data[s].m.avgArt)},
+    {label:"FRT + ART", get:s=>fmtDuration(data[s].m.sumFrtArt)},
+    {label:"Avg FRT + ART", get:s=>fmtDuration(data[s].m.avgCombined)},
+    {label:"SLA Breach", get:s=>data[s].m.slaBreach.toLocaleString()},
+    {label:"Reply Rate", get:s=>data[s].m.replyRate.toFixed(1)+"%"},
+  ];
+
+  let html = "<thead><tr><th></th>" + shifts.map(s=>`<th>${s} <span style="opacity:.75;font-weight:600;">(${shiftLabels[s]})</span></th>`).join("") + "</tr></thead><tbody>";
+  rowsDef.forEach(r=>{
+    if(r.group){
+      html += `<tr><td class="row-group-label">${r.group}</td>${shifts.map(()=>'<td class="row-group-label"></td>').join("")}</tr>`;
+    } else if(r.sep){
+      html += `<tr><td colspan="${shifts.length+1}" style="background:transparent;border:none;height:4px;padding:0;"></td></tr>`;
+    } else {
+      html += `<tr><td class="metric-label">${r.label}</td>${shifts.map(s=>`<td class="num">${r.get(s)}</td>`).join("")}</tr>`;
+    }
+  });
+  html += "</tbody>";
+  document.getElementById("shiftTable").innerHTML = html;
+}
+
+/* ============================================================
+   RENDER — Charts
+   ============================================================ */
+const palette = {teal:"#0f4a43", amber:"#d99a2b", coral:"#c1543c", pos:"#2f7a4f", neu:"#9a8a3f", neg:"#c1543c", mix:"#7d5fa3", grid:"#e4ddca"};
+
+function destroyChart(key){ if(CHARTS[key]){ CHARTS[key].destroy(); delete CHARTS[key]; } }
+
+function renderCharts(rows, m){
+  if(typeof Chart === "undefined"){ return; } // library still loading/falling back; renderAll() will be re-invoked once ready
+  // Trend over time
+  const byDaySets = {};
+  rows.forEach(r=>{ if(r.dayKey) (byDaySets[r.dayKey] = byDaySets[r.dayKey] || new Set()).add(r.ticket); });
+  const byDay = {}; Object.keys(byDaySets).forEach(d=> byDay[d]=byDaySets[d].size );
+  const days = Object.keys(byDay).sort();
+  destroyChart("trend");
+  CHARTS.trend = new Chart(document.getElementById("trendChart"), {
+    type:"line",
+    data:{ labels: days, datasets:[{ label:"Tickets", data: days.map(d=>byDay[d]), borderColor: palette.teal, backgroundColor:"rgba(15,74,67,.12)", fill:true, tension:.35, pointRadius:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:palette.grid}} } }
+  });
+
+  // Sentiment donut
+  destroyChart("sentiment");
+  CHARTS.sentiment = new Chart(document.getElementById("sentimentChart"), {
+    type:"doughnut",
+    data:{ labels:["Positive","Neutral","Negative","Mixed"], datasets:[{ data:[m.pos,m.neu,m.neg,m.mix], backgroundColor:[palette.pos,palette.neu,palette.neg,palette.mix], borderWidth:2, borderColor:"#fff" }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}}} }
+  });
+
+  // Source donut
+  destroyChart("source");
+  CHARTS.source = new Chart(document.getElementById("sourceChart"), {
+    type:"doughnut",
+    data:{ labels:["Facebook","Instagram"], datasets:[{ data:[m.fb,m.ig], backgroundColor:[palette.teal,palette.amber], borderWidth:2, borderColor:"#fff" }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}}} }
+  });
+
+  // Sentiment by shift stacked bar
+  const shifts = ["Shift 1","Shift 2","Shift 3"];
+  const sentTypes = ["Positive","Neutral","Negative","Mixed"];
+  const sentColors = [palette.pos, palette.neu, palette.neg, palette.mix];
+  destroyChart("shiftSentiment");
+  CHARTS.shiftSentiment = new Chart(document.getElementById("shiftSentimentChart"), {
+    type:"bar",
+    data:{ labels: shifts, datasets: sentTypes.map((s,i)=>({ label:s, data: shifts.map(sh=>uniqueTicketCount(rows.filter(r=>r.shift===sh && r.sentiment===s))), backgroundColor: sentColors[i] })) },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:11}}}}, scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:palette.grid}} } }
+  });
+
+  // Agent leaderboard
+  const agentTicketSets = {};
+  const agentBreachSets = {};
+  rows.forEach(r=>{
+    (agentTicketSets[r.agent] = agentTicketSets[r.agent] || new Set()).add(r.ticket);
+    if(r.sla) (agentBreachSets[r.agent] = agentBreachSets[r.agent] || new Set()).add(r.ticket);
+  });
+  const agentCounts = {}; Object.keys(agentTicketSets).forEach(a=> agentCounts[a]=agentTicketSets[a].size );
+  const agentBreach = {}; Object.keys(agentBreachSets).forEach(a=> agentBreach[a]=agentBreachSets[a].size );
+  const topAgents = Object.entries(agentCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  destroyChart("agent");
+  CHARTS.agent = new Chart(document.getElementById("agentChart"), {
+    type:"bar",
+    data:{ labels: topAgents.map(a=>a[0]), datasets:[
+      {label:"Tickets handled", data: topAgents.map(a=>a[1]), backgroundColor: palette.teal},
+      {label:"SLA breaches", data: topAgents.map(a=>agentBreach[a[0]]||0), backgroundColor: palette.coral}
+    ]},
+    options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:11}}}}, scales:{ x:{beginAtZero:true, grid:{color:palette.grid}}, y:{grid:{display:false}} } }
+  });
+
+  // Response time by shift
+  destroyChart("rt");
+  const rtData = shifts.map(s=>{
+    const sr = rows.filter(r=>r.shift===s);
+    const mm = computeMetrics(sr);
+    return { frt: mm.avgFrt? mm.avgFrt/60 : 0, art: mm.avgArt? mm.avgArt/60 : 0 };
+  });
+  CHARTS.rt = new Chart(document.getElementById("rtChart"), {
+    type:"bar",
+    data:{ labels: shifts, datasets:[
+      {label:"Avg FRT (min)", data: rtData.map(d=>d.frt.toFixed(2)), backgroundColor: palette.amber},
+      {label:"Avg ART (min)", data: rtData.map(d=>d.art.toFixed(2)), backgroundColor: palette.teal}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:11}}}}, scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:palette.grid}} } }
+  });
+}
+
+/* ============================================================
+   RENDER — Data table
+   ============================================================ */
+const TABLE_COLS = [
+  {key:"ticket", label:"Ticket ID"},
+  {key:"date", label:"Date", fmt:r=>r.date? r.date.toLocaleString() : "—"},
+  {key:"sourceGroup", label:"Source"},
+  {key:"shift", label:"Shift"},
+  {key:"agent", label:"Agent"},
+  {key:"sentiment", label:"Sentiment", fmt:r=>sentimentBadge(r.sentiment)},
+  {key:"frtSec", label:"FRT", fmt:r=>fmtDuration(r.frtSec)},
+  {key:"artSec", label:"ART", fmt:r=>fmtDuration(r.artSec)},
+  {key:"sla", label:"SLA Breach", fmt:r=>`<span class="badge ${r.sla?'sla-yes':'sla-no'}">${r.sla?'Yes':'No'}</span>`},
+  {key:"hasReply", label:"Replied", fmt:r=>r.hasReply?"Yes":"No"},
+];
+
+function sentimentBadge(s){
+  const cls = s==="Positive"?"pos":s==="Negative"?"neg":s==="Mixed"?"mix":"neu";
+  return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function renderDataTable(rows){
+  document.getElementById("dataTableHead").innerHTML = TABLE_COLS.map(c=>
+    `<th data-key="${c.key}">${c.label} ${STATE.sortCol===c.key ? (STATE.sortDir==="asc"?"▲":"▼") : ""}</th>`
+  ).join("");
+
+  let filtered = rows;
+  if(STATE.search){
+    const q = STATE.search.toLowerCase();
+    filtered = filtered.filter(r=> [r.ticket, r.agent, r.sentiment, r.sourceGroup, r.shift].some(v=>String(v).toLowerCase().includes(q)) );
+  }
+  filtered = [...filtered].sort((a,b)=>{
+    let av = a[STATE.sortCol], bv = b[STATE.sortCol];
+    if(av instanceof Date) av = av.getTime(); if(bv instanceof Date) bv = bv.getTime();
+    if(av===null||av===undefined) av = -Infinity; if(bv===null||bv===undefined) bv = -Infinity;
+    if(typeof av==="string") av = av.toLowerCase(); if(typeof bv==="string") bv = bv.toLowerCase();
+    if(av<bv) return STATE.sortDir==="asc"?-1:1;
+    if(av>bv) return STATE.sortDir==="asc"?1:-1;
+    return 0;
+  });
+
+  document.getElementById("tableCount").textContent = filtered.length.toLocaleString() + " tickets";
+
+  const MAX_ROWS = 400;
+  const display = filtered.slice(0, MAX_ROWS);
+  if(display.length===0){
+    document.getElementById("dataTableBody").innerHTML = `<tr><td colspan="${TABLE_COLS.length}"><div class="empty-state">No tickets match these filters.</div></td></tr>`;
+  } else {
+    document.getElementById("dataTableBody").innerHTML = display.map(r=>
+      `<tr>${TABLE_COLS.map(c=> `<td>${c.fmt ? c.fmt(r) : escapeHtml(r[c.key] ?? "—")}</td>`).join("")}</tr>`
+    ).join("");
+  }
+  window.__filteredForExport = filtered;
+}
+
+/* ============================================================
+   MASTER RENDER
+   ============================================================ */
+/* ============================================================
+   RENDER — Agent-wise breakdown
+   ============================================================ */
+function renderAgentTable(rows){
+  // Group by business-date + agent
+  const groups = {}; // key: "dayKey||agent"
+  rows.forEach(r=>{
+    const day = r.dayKey || (r.date ? dateKey(r.date) : "Unknown");
+    const key = day + "||" + r.agent;
+    if(!groups[key]) groups[key] = {date: day, agent: r.agent, tickets: new Set(), frtVals: [], artVals: []};
+    groups[key].tickets.add(r.ticket);
+    if(r.frtSec !== null && r.frtSec !== undefined) groups[key].frtVals.push(r.frtSec);
+    if(r.artSec !== null && r.artSec !== undefined) groups[key].artVals.push(r.artSec);
+  });
+
+  const sorted = Object.values(groups).sort((a,b)=>{
+    if(a.date < b.date) return -1;
+    if(a.date > b.date) return 1;
+    return a.agent.localeCompare(b.agent);
+  });
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+
+  // Totals row
+  const totalTickets = new Set(rows.map(r=>r.ticket)).size;
+  const allFrt = rows.map(r=>r.frtSec).filter(v=>v!==null&&v!==undefined);
+  const allArt = rows.map(r=>r.artSec).filter(v=>v!==null&&v!==undefined);
+
+  let html = sorted.length === 0
+    ? `<tr><td colspan="5"><div class="empty-state">No data for the selected filters.</div></td></tr>`
+    : sorted.map(g=>`
+      <tr>
+        <td class="num">${formatDisplayDate(g.date)}</td>
+        <td class="metric-label" style="font-weight:600;">${escapeHtml(g.agent)}</td>
+        <td class="num">${g.tickets.size.toLocaleString()}</td>
+        <td class="num">${fmtDuration(avg(g.frtVals))}</td>
+        <td class="num">${fmtDuration(avg(g.artVals))}</td>
+      </tr>`).join("");
+
+  // Total row
+  html += `<tr style="background:var(--amber-soft);font-weight:800;">
+    <td></td>
+    <td class="metric-label" style="font-weight:800;">Total</td>
+    <td class="num">${totalTickets.toLocaleString()}</td>
+    <td class="num">${fmtDuration(avg(allFrt))}</td>
+    <td class="num">${fmtDuration(avg(allArt))}</td>
+  </tr>`;
+
+  document.getElementById("agentBreakdownBody").innerHTML = html;
+}
+
+// Format "2026-07-01" → "01/07/2026"
+function formatDisplayDate(dayKey){
+  if(!dayKey || dayKey==="Unknown") return "—";
+  const [yr, mo, da] = dayKey.split("-");
+  return `${da}/${mo}/${yr}`;
+}
+
+function renderAll(){
+  const rows = getFiltered();
+  const m = computeMetrics(rows);
+  renderKpis(m);
+  renderShiftTable(rows);
+  renderAgentTable(rows);
+  renderCharts(rows, m);
+  renderDataTable(rows);
+}
+
+/* ============================================================
+   EVENT WIRING
+   ============================================================ */
+function wireChipGroup(containerId, stateKey){
+  const el = document.getElementById(containerId);
+  el.addEventListener("click", e=>{
+    const btn = e.target.closest(".chip");
+    if(!btn) return;
+    [...el.children].forEach(c=>c.classList.remove("active"));
+    btn.classList.add("active");
+    STATE[stateKey] = btn.dataset.value;
+    renderAll();
+  });
+}
+wireChipGroup("sourceChips","source");
+wireChipGroup("shiftChips","shift");
+wireChipGroup("sentimentChips","sentiment");
+
+document.getElementById("dateFrom").addEventListener("change", e=>{ STATE.dateFrom = e.target.value ? new Date(e.target.value) : null; renderAll(); });
+document.getElementById("dateTo").addEventListener("change", e=>{ STATE.dateTo = e.target.value ? new Date(e.target.value) : null; renderAll(); });
+document.getElementById("agentSelect").addEventListener("change", e=>{ STATE.agent = e.target.value; renderAll(); });
+
+document.getElementById("clearFiltersBtn").addEventListener("click", ()=>{
+  STATE = {...STATE, dateFrom:null, dateTo:null, source:"all", shift:"all", sentiment:"all", agent:"all", search:""};
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+  document.querySelector('#sourceChips [data-value="all"]').classList.add("active");
+  document.querySelector('#shiftChips [data-value="all"]').classList.add("active");
+  document.querySelector('#sentimentChips [data-value="all"]').classList.add("active");
+  document.getElementById("agentSelect").value = "all";
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value = "";
+  document.getElementById("tableSearch").value = "";
+  renderAll();
+});
+
+document.getElementById("tableSearch").addEventListener("input", e=>{ STATE.search = e.target.value; renderDataTable(getFiltered()); });
+
+document.getElementById("dataTableHead").addEventListener("click", e=>{
+  const th = e.target.closest("th");
+  if(!th) return;
+  const key = th.dataset.key;
+  if(STATE.sortCol===key){ STATE.sortDir = STATE.sortDir==="asc"?"desc":"asc"; }
+  else { STATE.sortCol = key; STATE.sortDir = "asc"; }
+  renderDataTable(getFiltered());
+});
+
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  const rows = window.__filteredForExport || [];
+  const headers = TABLE_COLS.map(c=>c.label);
+  const lines = [headers.join(",")];
+  rows.forEach(r=>{
+    const line = [
+      r.ticket, r.date?r.date.toLocaleString():"", r.sourceGroup, r.shift, r.agent, r.sentiment,
+      fmtDuration(r.frtSec), fmtDuration(r.artSec), r.sla?"Yes":"No", r.hasReply?"Yes":"No"
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",");
+    lines.push(line);
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "social-care-pulse-export.csv";
+  a.click();
+});
+
+document.getElementById("refreshBtn").addEventListener("click", ()=>loadData(true));
+
+/* ============================================================
+   INIT
+   ============================================================ */
+loadData(false);
+// Auto-refresh disabled — data only reloads when the user clicks "Refresh now."
+
+// Make sure Chart.js actually loaded; if the jsdelivr build tag failed, pull from a fallback CDN.
+ensureScript(
+  ()=> typeof Chart !== "undefined",
+  [
+    "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js",
+    "https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js"
+  ],
+  ()=>{ if(typeof Chart === "undefined"){ console.error("Chart.js failed to load from all CDNs."); } else { renderAll(); } }
+);
+ensureScript(
+  ()=> typeof Papa !== "undefined",
+  [
+    "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js",
+    "https://unpkg.com/papaparse@5.4.1/papaparse.min.js"
+  ],
+  ()=>{}
+);
 </script>
 </body>
 </html>
