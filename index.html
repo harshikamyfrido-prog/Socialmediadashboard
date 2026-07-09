@@ -256,8 +256,8 @@ footer.foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30p
   <div class="shell" style="padding:0;">
     <div class="top-row">
       <div>
-       
-        <h1 class="brand">Frido — Online Reputation Management</h1>
+        <div class="brand-eyebrow">Online Reputation Management</div>
+        <h1 class="brand">Frido</h1>
         <div class="brand-sub">Live mentions, response times and sentiment across Facebook & Instagram, broken down by shift and agent.</div>
       </div>
       <div class="status-cluster">
@@ -286,6 +286,8 @@ footer.foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30p
         <button class="chip active" data-value="all">All</button>
         <button class="chip" data-value="Facebook">Facebook</button>
         <button class="chip" data-value="Instagram">Instagram</button>
+        <button class="chip" data-value="GMB">GMB</button>
+        <button class="chip" data-value="Google Play Store">Google Play Store</button>
       </div>
     </div>
 
@@ -537,6 +539,8 @@ function getSourceGroup(sourceType){
   const s = (sourceType||"").toLowerCase().trim();
   if(s.includes("instagram")) return "Instagram";
   if(s.includes("facebook") || /\bfb\b/.test(s) || s.startsWith("fb")) return "Facebook";
+  if(s.includes("gmb") || s.includes("google my business") || s.includes("gmb reviews")) return "GMB";
+  if(s.includes("google play") || s.includes("play store")) return "Google Play Store";
   return "Other";
 }
 
@@ -686,6 +690,8 @@ function computeMetrics(rows){
   const total = uniqueTicketCount(rows);
   const fb = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="Facebook"));
   const ig = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="Instagram"));
+  const gmb = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="GMB"));
+  const gps = uniqueTicketCount(rows.filter(r=>r.sourceGroup==="Google Play Store"));
   const pos = uniqueTicketCount(rows.filter(r=>r.sentiment==="Positive"));
   const neg = uniqueTicketCount(rows.filter(r=>r.sentiment==="Negative"));
   const neu = uniqueTicketCount(rows.filter(r=>r.sentiment==="Neutral"));
@@ -703,7 +709,7 @@ function computeMetrics(rows){
   const slaBreach = uniqueTicketCount(rows.filter(r=>r.sla));
   const replied = uniqueTicketCount(rows.filter(r=>r.hasReply));
   const replyRate = total ? (replied/total*100) : 0;
-  return {total, fb, ig, pos, neg, neu, mix, avgFrt, avgArt, sumFrtArt, avgCombined, slaBreach, replied, replyRate};
+  return {total, fb, ig, gmb, gps, pos, neg, neu, mix, avgFrt, avgArt, sumFrtArt, avgCombined, slaBreach, replied, replyRate};
 }
 
 /* ============================================================
@@ -714,6 +720,8 @@ function renderKpis(m){
     {label:"Total Comments", value:m.total.toLocaleString(), sub:"matching current filters", cls:""},
     {label:"Facebook", value:m.fb.toLocaleString(), sub: m.total? (m.fb/m.total*100).toFixed(1)+"% of comments":"—", cls:""},
     {label:"Instagram", value:m.ig.toLocaleString(), sub: m.total? (m.ig/m.total*100).toFixed(1)+"% of comments":"—", cls:"amber"},
+    {label:"GMB", value:m.gmb.toLocaleString(), sub: m.total? (m.gmb/m.total*100).toFixed(1)+"% of comments":"—", cls:""},
+    {label:"Google Play Store", value:m.gps.toLocaleString(), sub: m.total? (m.gps/m.total*100).toFixed(1)+"% of comments":"—", cls:""},
     {label:"Positive", value:m.pos.toLocaleString(), sub: m.total? (m.pos/m.total*100).toFixed(1)+"% positive":"—", cls:"pos"},
     {label:"Negative", value:m.neg.toLocaleString(), sub: m.total? (m.neg/m.total*100).toFixed(1)+"% negative":"—", cls:"neg"},
     {label:"Avg FRT", value: fmtDuration(m.avgFrt), sub:"first response time", cls:""},
@@ -744,6 +752,8 @@ function renderShiftTable(rows){
       m: computeMetrics(sr),
       igMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="Instagram")),
       fbMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="Facebook")),
+      gmbMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="GMB")),
+      gpsMetrics: computeMetrics(sr.filter(r=>r.sourceGroup==="Google Play Store")),
     };
   });
 
@@ -759,6 +769,16 @@ function renderShiftTable(rows){
     {label:"Positive", get:s=>data[s].igMetrics.pos.toLocaleString()},
     {label:"Negative", get:s=>data[s].igMetrics.neg.toLocaleString()},
     {label:"Neutral", get:s=>data[s].igMetrics.neu.toLocaleString()},
+    {group:"GMB"},
+    {label:"Total no. of Comments", get:s=>data[s].gmbMetrics.total.toLocaleString()},
+    {label:"Positive", get:s=>data[s].gmbMetrics.pos.toLocaleString()},
+    {label:"Negative", get:s=>data[s].gmbMetrics.neg.toLocaleString()},
+    {label:"Neutral", get:s=>data[s].gmbMetrics.neu.toLocaleString()},
+    {group:"Google Play Store"},
+    {label:"Total no. of Comments", get:s=>data[s].gpsMetrics.total.toLocaleString()},
+    {label:"Positive", get:s=>data[s].gpsMetrics.pos.toLocaleString()},
+    {label:"Negative", get:s=>data[s].gpsMetrics.neg.toLocaleString()},
+    {label:"Neutral", get:s=>data[s].gpsMetrics.neu.toLocaleString()},
     {sep:true},
     {label:"FRT", get:s=>fmtDuration(data[s].m.avgFrt)},
     {label:"ART", get:s=>fmtDuration(data[s].m.avgArt)},
@@ -815,7 +835,7 @@ function renderCharts(rows, m){
   destroyChart("source");
   CHARTS.source = new Chart(document.getElementById("sourceChart"), {
     type:"doughnut",
-    data:{ labels:["Facebook","Instagram"], datasets:[{ data:[m.fb,m.ig], backgroundColor:[palette.teal,palette.amber], borderWidth:2, borderColor:"#fff" }]},
+    data:{ labels:["Facebook","Instagram","GMB","Google Play Store"], datasets:[{ data:[m.fb,m.ig,m.gmb,m.gps], backgroundColor:[palette.teal,palette.amber,"#7d5fa3","#2f7a4f"], borderWidth:2, borderColor:"#fff" }]},
     options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}}} }
   });
 
