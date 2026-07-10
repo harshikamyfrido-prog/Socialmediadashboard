@@ -295,9 +295,10 @@ footer.foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30p
       <span class="filter-label">Shift</span>
       <div class="chip-row" id="shiftChips">
         <button class="chip active" data-value="all">All</button>
-        <button class="chip" data-value="Shift 1">Shift 1 · 1–9am</button>
-        <button class="chip" data-value="Shift 2">Shift 2 · 9am–5pm</button>
-        <button class="chip" data-value="Shift 3">Shift 3 · 5pm–1am</button>
+        <button class="chip" data-value="Night Shift">Night · 11pm–6am</button>
+        <button class="chip" data-value="Morning Shift">Morning · 6am–2pm</button>
+        <button class="chip" data-value="Gap Shift">Gap · 2pm–4pm</button>
+        <button class="chip" data-value="Evening Shift">Evening · 4pm–11pm</button>
       </div>
     </div>
 
@@ -544,24 +545,35 @@ function getSourceGroup(sourceType){
   return "Other";
 }
 
-// Shift 1: 1:00am–9:00am · Shift 2: 9:00:01am–5:00pm · Shift 3: 5:00:01pm–12:59:59am (next calendar day)
-// The post-midnight slice (12:00am–12:59:59am) belongs to the PREVIOUS day's Shift 3.
+// Shift definitions:
+// Night shift:   11:00pm – 6:00am (crosses midnight; 12am–6am tail belongs to previous day)
+// Morning shift: 6:01am – 2:00pm
+// Gap shift:     2:01pm – 4:00pm
+// Evening shift: 4:01pm – 10:59pm
 function getShiftInfo(date){
   if(!date) return {shift:"Unknown", businessDate:null};
   const totalSec = date.getHours()*3600 + date.getMinutes()*60 + date.getSeconds();
   const calDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-  if(totalSec < 3600){ // 00:00:00–00:59:59 -> tail end of previous day's Shift 3
+  // 12:00:00am–6:00:00am → tail of previous day's Night shift
+  if(totalSec <= 21600){
     const businessDate = new Date(calDate); businessDate.setDate(businessDate.getDate()-1);
-    return {shift:"Shift 3", businessDate};
+    return {shift:"Night Shift", businessDate};
   }
-  if(totalSec <= 32400){ // up to and including 09:00:00
-    return {shift:"Shift 1", businessDate:calDate};
+  // 6:00:01am–2:00:00pm
+  if(totalSec <= 50400){
+    return {shift:"Morning Shift", businessDate:calDate};
   }
-  if(totalSec <= 61200){ // up to and including 17:00:00
-    return {shift:"Shift 2", businessDate:calDate};
+  // 2:00:01pm–4:00:00pm
+  if(totalSec <= 57600){
+    return {shift:"Gap Shift", businessDate:calDate};
   }
-  return {shift:"Shift 3", businessDate:calDate}; // 17:00:01–23:59:59
+  // 4:00:01pm–10:59:59pm
+  if(totalSec <= 82799){
+    return {shift:"Evening Shift", businessDate:calDate};
+  }
+  // 11:00:00pm–11:59:59pm → start of Night shift (belongs to this calendar day)
+  return {shift:"Night Shift", businessDate:calDate};
 }
 
 function dateKey(d){
@@ -651,7 +663,7 @@ function populateAgentOptions(){
 /* ============================================================
    FILTERING
    ============================================================ */
-// Filters against each row's businessDate, so the post-midnight tail of Shift 3
+// Filters against the row's actual calendar date.
 // (12:00am–12:59am) stays grouped with the day its shift started on.
 function inDateRange(actualDate){
   if(!STATE.dateFrom && !STATE.dateTo) return true; // no custom range selected -> show all
@@ -743,8 +755,8 @@ function renderKpis(m){
    RENDER — Shift breakdown table (recreates screenshot)
    ============================================================ */
 function renderShiftTable(rows){
-  const shifts = ["Shift 1","Shift 2","Shift 3"];
-  const shiftLabels = {"Shift 1":"1AM–9AM","Shift 2":"9AM–5PM","Shift 3":"5PM–1AM"};
+  const shifts = ["Night Shift","Morning Shift","Gap Shift","Evening Shift"];
+  const shiftLabels = {"Night Shift":"11PM–6AM","Morning Shift":"6AM–2PM","Gap Shift":"2PM–4PM","Evening Shift":"4PM–11PM"};
   const data = {};
   shifts.forEach(s=>{
     const sr = rows.filter(r=>r.shift===s);
@@ -840,13 +852,14 @@ function renderCharts(rows, m){
   });
 
   // Sentiment by shift stacked bar
-  const shifts = ["Shift 1","Shift 2","Shift 3"];
+  const shifts = ["Night Shift","Morning Shift","Gap Shift","Evening Shift"];
+  const shiftShortLabels = ["Night\n11pm–6am","Morning\n6am–2pm","Gap\n2pm–4pm","Evening\n4pm–11pm"];
   const sentTypes = ["Positive","Neutral","Negative","Mixed"];
   const sentColors = [palette.pos, palette.neu, palette.neg, palette.mix];
   destroyChart("shiftSentiment");
   CHARTS.shiftSentiment = new Chart(document.getElementById("shiftSentimentChart"), {
     type:"bar",
-    data:{ labels: shifts, datasets: sentTypes.map((s,i)=>({ label:s, data: shifts.map(sh=>uniqueTicketCount(rows.filter(r=>r.shift===sh && r.sentiment===s))), backgroundColor: sentColors[i] })) },
+    data:{ labels: shiftShortLabels, datasets: sentTypes.map((s,i)=>({ label:s, data: shifts.map(sh=>uniqueTicketCount(rows.filter(r=>r.shift===sh && r.sentiment===s))), backgroundColor: sentColors[i] })) },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:11}}}}, scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:palette.grid}} } }
   });
 
@@ -879,7 +892,7 @@ function renderCharts(rows, m){
   });
   CHARTS.rt = new Chart(document.getElementById("rtChart"), {
     type:"bar",
-    data:{ labels: shifts, datasets:[
+    data:{ labels: shiftShortLabels, datasets:[
       {label:"Avg FRT (min)", data: rtData.map(d=>d.frt.toFixed(2)), backgroundColor: palette.amber},
       {label:"Avg ART (min)", data: rtData.map(d=>d.art.toFixed(2)), backgroundColor: palette.teal}
     ]},
